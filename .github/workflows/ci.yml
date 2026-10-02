@@ -49,9 +49,6 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
-      - name: Resolve dependencies
-        run: cargo generate-lockfile
-
       - name: Check
         run: cargo check --locked
 
