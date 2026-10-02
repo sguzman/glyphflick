@@ -20,6 +20,8 @@ pub struct GlyphflickApp<B> {
     error: Option<String>,
     focus_search: bool,
     first_ui: bool,
+    defer_grid_once: bool,
+    followup_redraw: bool,
     exit_requested: bool,
     columns: usize,
     visible_rows: Range<usize>,
@@ -57,6 +59,8 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
             error: None,
             focus_search: true,
             first_ui: true,
+            defer_grid_once: timing.defer_grid(),
+            followup_redraw: false,
             exit_requested: false,
             columns: 1,
             visible_rows: 0..0,
@@ -70,6 +74,13 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
     #[inline]
     pub const fn exit_requested(&self) -> bool {
         self.exit_requested
+    }
+
+    #[inline]
+    pub fn take_followup_redraw(&mut self) -> bool {
+        let requested = self.followup_redraw;
+        self.followup_redraw = false;
+        requested
     }
 
     fn refresh_results(&mut self) {
@@ -143,9 +154,14 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        if self.first_ui {
+        let is_first_ui = self.first_ui;
+        if is_first_ui {
             self.first_ui = false;
             self.timing.mark_first_ui();
+        }
+        let defer_grid = is_first_ui && self.defer_grid_once;
+        if defer_grid {
+            self.defer_grid_once = false;
         }
 
         if ui.input(|input| input.key_pressed(egui::Key::Escape)) {
@@ -186,58 +202,62 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
                 ui.colored_label(ui.visuals().error_fg_color, error);
             }
 
-            let spacing = ui.spacing().item_spacing.x;
-            let columns = ((ui.available_width() + spacing) / (CELL_SIZE + spacing))
-                .floor()
-                .max(1.0) as usize;
-            self.columns = columns;
+            if defer_grid {
+                self.followup_redraw = true;
+            } else {
+                let spacing = ui.spacing().item_spacing.x;
+                let columns = ((ui.available_width() + spacing) / (CELL_SIZE + spacing))
+                    .floor()
+                    .max(1.0) as usize;
+                self.columns = columns;
 
-            let row_height = CELL_SIZE + ui.spacing().item_spacing.y;
-            let rows = self.results.len().div_ceil(columns);
-            let active = self.selection.active();
+                let row_height = CELL_SIZE + ui.spacing().item_spacing.y;
+                let rows = self.results.len().div_ceil(columns);
+                let active = self.selection.active();
 
-            let mut scroll = egui::ScrollArea::vertical().auto_shrink([false, false]);
-            if let Some(row) = self.scroll_row.take() {
-                scroll = scroll.vertical_scroll_offset(row as f32 * row_height);
-            }
+                let mut scroll = egui::ScrollArea::vertical().auto_shrink([false, false]);
+                if let Some(row) = self.scroll_row.take() {
+                    scroll = scroll.vertical_scroll_offset(row as f32 * row_height);
+                }
 
-            let mut visible_rows = self.visible_rows.clone();
-            scroll.show_rows(ui, row_height, rows, |ui, row_range| {
-                visible_rows = row_range.clone();
+                let mut visible_rows = self.visible_rows.clone();
+                scroll.show_rows(ui, row_height, rows, |ui, row_range| {
+                    visible_rows = row_range.clone();
 
-                for row in row_range {
-                    ui.horizontal(|ui| {
-                        for column in 0..columns {
-                            let position = row * columns + column;
-                            let Some(index) = self.results.get(position) else {
-                                break;
-                            };
-                            let glyph = self.corpus.get(index);
+                    for row in row_range {
+                        ui.horizontal(|ui| {
+                            for column in 0..columns {
+                                let position = row * columns + column;
+                                let Some(index) = self.results.get(position) else {
+                                    break;
+                                };
+                                let glyph = self.corpus.get(index);
 
-                            let response = ui
-                                .add_sized(
-                                    [CELL_SIZE, CELL_SIZE],
-                                    egui::Button::selectable(
-                                        active == Some(position),
-                                        egui::RichText::new(glyph.text())
-                                            .font(self.emoji_font.clone()),
-                                    ),
-                                )
-                                .on_hover_text(glyph.name());
+                                let response = ui
+                                    .add_sized(
+                                        [CELL_SIZE, CELL_SIZE],
+                                        egui::Button::selectable(
+                                            active == Some(position),
+                                            egui::RichText::new(glyph.text())
+                                                .font(self.emoji_font.clone()),
+                                        ),
+                                    )
+                                    .on_hover_text(glyph.name());
 
-                            if response.clicked() {
-                                picked = Some(glyph.text());
+                                if response.clicked() {
+                                    picked = Some(glyph.text());
+                                }
                             }
-                        }
+                        });
+                    }
+                });
+                self.visible_rows = visible_rows;
+
+                if self.results.is_empty() {
+                    ui.centered_and_justified(|ui| {
+                        ui.weak("No matching glyphs");
                     });
                 }
-            });
-            self.visible_rows = visible_rows;
-
-            if self.results.is_empty() {
-                ui.centered_and_justified(|ui| {
-                    ui.weak("No matching glyphs");
-                });
             }
         });
 
