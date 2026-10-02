@@ -29,6 +29,8 @@ pub fn run(timing: Timing) -> Result<(), winit::error::EventLoopError> {
 
 struct Runtime {
     timing: Timing,
+    #[cfg(feature = "timing")]
+    first_swap_pending: bool,
     gl_window: Option<GlutinWindowContext>,
     egui_glow: Option<egui_glow::EguiGlow>,
     app: Option<GlyphflickApp<WlCopyClipboard>>,
@@ -38,6 +40,8 @@ impl Runtime {
     const fn new(timing: Timing) -> Self {
         Self {
             timing,
+            #[cfg(feature = "timing")]
+            first_swap_pending: true,
             gl_window: None,
             egui_glow: None,
             app: None,
@@ -53,9 +57,15 @@ impl ApplicationHandler for Runtime {
 
         event_loop.set_control_flow(ControlFlow::Wait);
 
-        let (gl_window, gl) = create_display(event_loop);
+        let runtime_start = self.timing.stamp();
+        let (gl_window, gl) = create_display(event_loop, self.timing);
+        self.timing.report_runtime_init(runtime_start);
+
+        let egui_start = self.timing.stamp();
         let egui_glow =
             egui_glow::EguiGlow::new(event_loop, Arc::new(gl), None, None, false);
+        self.timing.report_egui_init(egui_start);
+
         let app = GlyphflickApp::new(&egui_glow.egui_ctx, WlCopyClipboard, self.timing);
 
         gl_window.window().request_redraw();
@@ -102,6 +112,13 @@ impl ApplicationHandler for Runtime {
             if let Err(error) = gl_window.swap_buffers() {
                 eprintln!("glyphflick: buffer swap failed: {error}");
                 event_loop.exit();
+                return;
+            }
+
+            #[cfg(feature = "timing")]
+            if self.first_swap_pending {
+                self.first_swap_pending = false;
+                self.timing.mark_first_swap();
             }
             return;
         }
@@ -136,7 +153,7 @@ struct GlutinWindowContext {
 }
 
 impl GlutinWindowContext {
-    fn new(event_loop: &ActiveEventLoop) -> Self {
+    fn new(event_loop: &ActiveEventLoop, timing: Timing) -> Self {
         let window_attributes = window_attributes();
 
         let config_template = glutin::config::ConfigTemplateBuilder::new()
@@ -207,10 +224,10 @@ impl GlutinWindowContext {
             .make_current(&gl_surface)
             .expect("failed to make OpenGL context current");
 
-        let _ = gl_surface.set_swap_interval(
-            &gl_context,
-            glutin::surface::SwapInterval::DontWait,
-        );
+        let swap_interval_disabled = gl_surface
+            .set_swap_interval(&gl_context, glutin::surface::SwapInterval::DontWait)
+            .is_ok();
+        timing.report_swap_interval(swap_interval_disabled);
 
         Self {
             window,
@@ -260,8 +277,11 @@ fn window_attributes() -> WindowAttributes {
         .with_name("glyphflick", "glyphflick")
 }
 
-fn create_display(event_loop: &ActiveEventLoop) -> (GlutinWindowContext, egui_glow::glow::Context) {
-    let gl_window = GlutinWindowContext::new(event_loop);
+fn create_display(
+    event_loop: &ActiveEventLoop,
+    timing: Timing,
+) -> (GlutinWindowContext, egui_glow::glow::Context) {
+    let gl_window = GlutinWindowContext::new(event_loop, timing);
     let gl = unsafe {
         egui_glow::glow::Context::from_loader_function(|symbol| {
             let symbol =
