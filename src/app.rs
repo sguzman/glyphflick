@@ -26,6 +26,7 @@ pub struct GlyphflickApp<B> {
     scroll_row: Option<usize>,
     timing: Timing,
     emoji_font: egui::FontId,
+    emoji_font_missing: bool,
 }
 
 impl<B: ClipboardBackend> GlyphflickApp<B> {
@@ -33,6 +34,7 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
         let font_start = timing.stamp();
         let emoji_font_status = fonts::install(ctx);
         timing.report_font_init(font_start, emoji_font_status.is_mapped());
+        let emoji_font_missing = !emoji_font_status.is_mapped();
         let emoji_font = fonts::emoji_font_id(GLYPH_SIZE);
         ctx.set_visuals(egui::Visuals::dark());
         ctx.all_styles_mut(|style| {
@@ -61,6 +63,7 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
             scroll_row: None,
             timing,
             emoji_font,
+            emoji_font_missing,
         }
     }
 
@@ -170,6 +173,13 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
             if response.changed() {
                 self.error = None;
                 self.refresh_results();
+            }
+
+            if self.emoji_font_missing {
+                ui.colored_label(
+                    ui.visuals().error_fg_color,
+                    "Noto Color Emoji font not found; emoji rendering is unavailable",
+                );
             }
 
             if let Some(error) = &self.error {
