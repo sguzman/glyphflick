@@ -29,7 +29,7 @@ pub struct GlyphflickApp<B> {
 impl<B: ClipboardBackend> GlyphflickApp<B> {
     pub fn new(ctx: &egui::Context, clipboard: B, timing: Timing) -> Self {
         ctx.set_visuals(egui::Visuals::dark());
-        ctx.style_mut(|style| {
+        ctx.all_styles_mut(|style| {
             style.animation_time = 0.0;
             style.interaction.tooltip_delay = 0.0;
             style.interaction.show_tooltips_only_when_still = false;
@@ -147,7 +147,7 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
 
         let mut picked = None;
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             let response = ui.add_sized(
                 [ui.available_width(), SEARCH_HEIGHT],
                 egui::TextEdit::singleline(&mut self.query)
