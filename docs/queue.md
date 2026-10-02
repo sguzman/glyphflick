@@ -254,6 +254,7 @@ Already applied before measurement because they remove obviously unused machiner
 - [x] eframe PNG application-icon path omitted;
 - [x] event loop uses Wait rather than Poll;
 - [x] swap interval explicitly requests DontWait;
+- [x] opaque EGL config requests alpha size 0 after target A/B reduced median first-swap completion by ~1.1 ms;
 - [x] no async runtime;
 - [x] no logging/profiling framework;
 - [x] no config parsing/filesystem I/O on launch;
