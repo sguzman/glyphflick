@@ -237,3 +237,14 @@ Interpretation:
 - GL paint is roughly 2.4–2.5 ms and the first swap call itself is under 1 ms.
 - GLES improved the repeated median but showed a one-off 12.321 ms egui runtime initialization spike on its first measured launch, so it is not promoted from one series.
 - Alpha-zero is appropriate for Glyphflick's intentionally opaque window and improved the median without changing the context API. It is promoted to the production EGL template.
+
+
+### Next architecture probe
+
+`scripts/latency-probe.sh` is the next target-host experiment. It measures three paths with the same invocation series:
+
+1. production OpenGL with the promoted alpha-zero EGL config;
+2. timing-only deferred-grid rendering, reporting both the first shell swap and second fully populated swap;
+3. a flat Wayland softbuffer presenter, with setup, buffer acquisition/fill, present-call, and process-to-first-present timings.
+
+The softbuffer crate is gated behind the `softbuffer-probe` feature and is absent from the normal production dependency tree. CI compiles it under all-features/all-targets, while the runtime-budget workflow confirms the default release remains 6,181,056 bytes / 5.895 MiB.
