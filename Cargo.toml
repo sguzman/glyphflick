@@ -11,7 +11,7 @@ default = []
 timing = []
 
 [dependencies]
-egui = { version = "=0.36.2", default-features = false, features = ["default_fonts"] }
+egui = { version = "=0.36.2", default-features = false }
 egui_glow = { version = "=0.36.2", default-features = false, features = ["winit", "wayland"] }
 emojis = "=0.9.0"
 epaint_default_fonts = "=0.36.2"
