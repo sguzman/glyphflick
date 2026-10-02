@@ -72,7 +72,7 @@ The helper is intentionally invoked only at commit time, so it contributes zero 
 Acceptance:
 
 - [x] clicking a glyph invokes clipboard backend;
-- [x] Enter commits the first ranked result;
+- [x] Enter commits the active result, or the first ranked result when navigation has not started;
 - [x] successful backend return requests immediate viewport close;
 - [x] failed copy leaves UI visible with inline error;
 - [x] Escape requests close without clipboard work;
@@ -130,20 +130,42 @@ Acceptance:
 
 ## Q009 — Keyboard navigation
 
-**Status: IN PROGRESS**
+**Status: CODE COMPLETE / QA PENDING**
 
-Already present:
+Acceptance:
 
-- [x] typing searches;
-- [x] Enter commits the first ranked result;
-- [x] Escape cancels.
+- [x] typing remains focused on search;
+- [x] Up/Down enters result navigation without a separate mode button;
+- [x] active result state is index-only and allocation-free;
+- [x] spatial arrow navigation follows rendered columns;
+- [x] Left/Right remain normal text editing until result navigation is active;
+- [x] off-screen active rows jump directly into view without animation;
+- [x] query edits reset result selection and return to the top;
+- [x] Enter commits the active result, or first ranked result before navigation;
+- [x] Escape cancels;
+- [x] navigation has unit tests in-tree;
+- [ ] keyboard behavior verified on target host.
 
-Remaining:
+## Q008A — Emoji font coverage and startup-cost spike
 
-- [ ] active result state;
-- [ ] spatial arrow navigation;
-- [ ] active-result visibility/scroll behavior;
-- [ ] keyboard/pointer selection-state coherence.
+**Status: BLOCKING DESIGN / MEASUREMENT PENDING**
+
+Current egui bundled fonts intentionally cover only a subset of the complete modern emoji corpus. Glyphflick must not silently present missing-glyph boxes, but it also must not solve coverage by adding expensive font discovery/parsing to every invocation without measurement.
+
+Evaluate:
+
+- bundled egui defaults as latency baseline;
+- one explicitly bundled modern emoji font;
+- system-font discovery/loading only if its startup cost is competitive;
+- corpus filtering only as a fallback, because silently shrinking the useful corpus is undesirable.
+
+Acceptance:
+
+- [ ] representative Unicode 17 coverage quantified;
+- [ ] startup/font initialization cost measured for viable approaches;
+- [ ] selected strategy does not perform unnecessary per-launch discovery;
+- [ ] rendering strategy documented in an ADR;
+- [ ] host rendering verified.
 
 ## Q010 — Stable window identity
 
@@ -165,12 +187,14 @@ Zero-dependency opt-in timing probes now exist behind `GLYPHFLICK_TIMING`.
 Currently instrumented:
 
 - [x] process-main start to first UI pass;
+- [x] corpus initialization time and glyph count;
 - [x] search update time and result count;
-- [x] clipboard establishment call.
+- [x] clipboard establishment call;
+- [x] all timing probes compile out of normal release builds.
 
 Still needed:
 
-- [ ] corpus initialization time;
+- [ ] first actually presented frame methodology;
 - [ ] first actually presented frame methodology;
 - [ ] visible dismissal measurement;
 - [ ] binary size;
@@ -202,7 +226,7 @@ Measurement-dependent work remains intentionally open.
 
 ## Q013 — Real Wayland QA
 
-**Status: BLOCKED ON Q009/Q011/Q012**
+**Status: BLOCKED ON Q008A/Q011/Q012**
 
 Manual host verification:
 
