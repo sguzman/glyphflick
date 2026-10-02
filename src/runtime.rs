@@ -35,6 +35,8 @@ struct Runtime {
     timing: Timing,
     #[cfg(feature = "timing")]
     first_swap_pending: bool,
+    #[cfg(feature = "timing")]
+    second_swap_pending: bool,
     gl_window: Option<GlutinWindowContext>,
     egui_glow: Option<egui_glow::EguiGlow>,
     app: Option<GlyphflickApp<WlCopyClipboard>>,
@@ -46,6 +48,8 @@ impl Runtime {
             timing,
             #[cfg(feature = "timing")]
             first_swap_pending: true,
+            #[cfg(feature = "timing")]
+            second_swap_pending: true,
             gl_window: None,
             egui_glow: None,
             app: None,
@@ -104,6 +108,9 @@ impl ApplicationHandler for Runtime {
 
             #[cfg(feature = "timing")]
             let first_egui_start = self.first_swap_pending.then(|| self.timing.stamp());
+            #[cfg(feature = "timing")]
+            let second_egui_start =
+                (!self.first_swap_pending && self.second_swap_pending).then(|| self.timing.stamp());
 
             egui_glow.run(gl_window.window(), |ui| app.ui(ui));
 
@@ -111,6 +118,12 @@ impl ApplicationHandler for Runtime {
             if let Some(start) = first_egui_start {
                 self.timing.report_first_egui_run(start);
             }
+            #[cfg(feature = "timing")]
+            if let Some(start) = second_egui_start {
+                self.timing.report_second_egui_run(start);
+            }
+
+            let followup_redraw = app.take_followup_redraw();
 
             if app.exit_requested() {
                 event_loop.exit();
@@ -119,6 +132,9 @@ impl ApplicationHandler for Runtime {
 
             #[cfg(feature = "timing")]
             let first_paint_start = self.first_swap_pending.then(|| self.timing.stamp());
+            #[cfg(feature = "timing")]
+            let second_paint_start =
+                (!self.first_swap_pending && self.second_swap_pending).then(|| self.timing.stamp());
 
             let screen_size: [u32; 2] = gl_window.window().inner_size().into();
             egui_glow.painter.clear(screen_size, CLEAR_COLOR);
@@ -128,9 +144,16 @@ impl ApplicationHandler for Runtime {
             if let Some(start) = first_paint_start {
                 self.timing.report_first_gl_paint(start);
             }
+            #[cfg(feature = "timing")]
+            if let Some(start) = second_paint_start {
+                self.timing.report_second_gl_paint(start);
+            }
 
             #[cfg(feature = "timing")]
             let first_swap_start = self.first_swap_pending.then(|| self.timing.stamp());
+            #[cfg(feature = "timing")]
+            let second_swap_start =
+                (!self.first_swap_pending && self.second_swap_pending).then(|| self.timing.stamp());
 
             if let Err(error) = gl_window.swap_buffers() {
                 eprintln!("glyphflick: buffer swap failed: {error}");
@@ -149,6 +172,20 @@ impl ApplicationHandler for Runtime {
                     event_loop.exit();
                     return;
                 }
+            } else if self.second_swap_pending {
+                if let Some(start) = second_swap_start {
+                    self.timing.report_second_swap_call(start);
+                }
+                self.second_swap_pending = false;
+                self.timing.mark_second_swap();
+                if self.timing.exit_after_second_swap() {
+                    event_loop.exit();
+                    return;
+                }
+            }
+
+            if followup_redraw {
+                gl_window.window().request_redraw();
             }
             return;
         }
