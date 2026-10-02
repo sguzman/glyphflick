@@ -1,0 +1,30 @@
+name: Lockfile Refresh
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: glyphflick-lockfile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo generate-lockfile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: glyphflick-cargo-lock
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 1
