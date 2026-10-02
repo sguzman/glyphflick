@@ -5,102 +5,168 @@
 
 ## Context
 
-Glyphflick's corpus targets modern Unicode emoji, but egui 0.36.2 documents that its default bundled fonts cover only about 1,216 emoji.
+Glyphflick targets a Unicode 17 emoji corpus, but rendering coverage and launch latency pull in opposite directions.
+
+The exact egui 0.36.2 release documents that its default bundled fonts support roughly 1,216 emoji. The bundled set is deterministic and avoids runtime host-font discovery, but it cannot represent the complete Unicode 17 corpus.
 
 That creates two simultaneous requirements:
 
-1. the picker must not advertise glyphs that render as missing boxes;
-2. fixing coverage must not quietly add large startup costs through font discovery, filesystem scans, parsing, or oversized assets.
+1. the picker must not silently advertise large numbers of missing-glyph boxes;
+2. fixing coverage must not quietly add expensive per-launch font discovery, filesystem scans, decoding, or oversized assets.
 
-This is especially important because Glyphflick is process-per-invocation and latency is the primary product constraint.
+This is a process-per-invocation utility. Font work is therefore part of the startup critical path.
 
-## Current temporary position
+## Verified baseline
 
-Keep egui's bundled default fonts for the first executable baseline.
+The current `egui/default_fonts` feature embeds the 0.36.2 default font package, including:
 
-Do **not** add system-font enumeration or an additional font package blindly.
+- Ubuntu Light for proportional UI text;
+- Hack for monospace text;
+- Noto Emoji;
+- emoji-icon-font.
 
-The baseline is valuable because it gives us the lowest-complexity font initialization path against which alternatives can be measured.
+No eframe/system-font provider is installed by Glyphflick's direct runtime.
+
+Therefore the baseline is:
+
+- deterministic;
+- offline;
+- no runtime system-font search;
+- approximately 1,216 documented emoji supported;
+- incomplete relative to the Unicode 17 corpus.
+
+## Immediate optimization opportunity
+
+Glyphflick does not need a dedicated code font.
+
+After the runtime reaches compile-clean validation, measure replacing `egui/default_fonts` with an explicit font definition containing only the faces the picker actually uses:
+
+- Ubuntu Light;
+- Noto Emoji;
+- emoji-icon-font if its additional coverage is useful.
+
+This may remove Hack and an unused fallback path from first-frame font initialization.
+
+Do not land that change before a clean baseline build exists; otherwise font work muddies runtime validation.
 
 ## Candidate strategies
 
-### A. egui bundled defaults
+### A. Current deterministic egui bundle
 
 Advantages:
 
-- no extra runtime discovery;
-- no project-maintained font asset;
-- simple baseline.
+- no runtime discovery;
+- simple baseline;
+- known egui compatibility.
 
 Disadvantage:
 
-- incomplete modern emoji coverage.
+- incomplete modern emoji coverage;
+- includes at least one font Glyphflick likely does not need.
 
-### B. Explicitly bundled modern monochrome emoji font
+### B. Slimmed deterministic egui font subset
 
 Advantages:
 
-- deterministic coverage;
-- no filesystem discovery;
-- stable across hosts.
+- preserves offline deterministic startup;
+- may remove unused font parsing/fallback work;
+- no new font asset source.
 
-Costs to measure:
+Disadvantage:
 
+- same fundamental emoji coverage ceiling unless the source font changes.
+
+This is the preferred first latency experiment after compile validation.
+
+### C. Explicitly bundled newer monochrome emoji dependency
+
+Advantages:
+
+- potentially much broader modern emoji coverage;
+- deterministic;
+- no filesystem discovery.
+
+Costs to establish before adoption:
+
+- actual Unicode version/coverage;
 - binary size;
-- font parse/registration time;
-- first glyph atlas work.
+- parse/registration time;
+- first visible-frame cost;
+- licensing/distribution implications.
 
-### C. System font discovery/loading
+Do not add raw font files to this repository merely for convenience.
+
+### D. System font discovery/loading
 
 Advantages:
 
-- potentially uses the host's current emoji fonts;
-- avoids bundling another font asset.
+- may use the host's current emoji fonts.
 
 Risks:
 
-- startup filesystem/fontconfig work;
-- host-dependent availability and behavior;
-- harder-to-reproduce latency.
+- per-launch filesystem/fontconfig work;
+- host-dependent results;
+- reproducibility problems;
+- color-font decoding may add more runtime machinery.
 
-### D. Restrict corpus to renderable bundled glyphs
+This is not the preferred path for a latency-first process-per-invocation utility.
+
+### E. Restrict corpus to verified-renderable bundled glyphs
 
 Advantages:
 
-- minimal runtime complexity.
+- minimal runtime complexity;
+- no missing-glyph entries.
 
 Disadvantage:
 
-- sacrifices corpus completeness and can hide useful modern emoji.
+- intentionally sacrifices corpus completeness.
 
-Treat this as fallback rather than preferred product behavior.
+Treat as a fallback if broader rendering imposes unacceptable launch cost.
 
-### E. Image/texture emoji atlas
+### F. Image/texture emoji atlas
 
-Not preferred for the MVP.
+Not preferred for MVP.
 
-It adds asset, texture, and rendering complexity to solve a text-selection utility problem and must show a compelling measured advantage before consideration.
+It adds asset, texture, and rendering complexity and must demonstrate a compelling measured latency/correctness advantage before consideration.
 
 ## Decision rule
 
-Choose the approach that provides acceptable modern emoji coverage with the lowest measured launch and first-frame cost.
+Choose the approach that gives the best useful emoji coverage at the lowest measured first-visible-frame cost.
 
-Do not optimize binary size at the expense of launch latency merely because it is easier to measure.
+Priority order for this decision:
 
-Do not perform per-invocation font discovery if a deterministic bundled solution is faster.
+1. visible entries must actually render;
+2. no runtime host-font scan unless measurements prove it competitive;
+3. minimize first-frame font initialization;
+4. minimize binary/asset size where it does not conflict with launch speed;
+5. expand coverage toward Unicode 17.
+
+Do not optimize binary size at the expense of launch latency merely because size is easier to measure.
+
+## Measurement plan
+
+Once the build is validated:
+
+1. record the current default-font first-swap baseline;
+2. measure a slimmed deterministic font subset;
+3. quantify renderable representative emoji coverage;
+4. only then evaluate a newer bundled emoji source if coverage remains unacceptable.
+
+Representative coverage must include:
+
+- basic emoji;
+- variation-selector sequences;
+- skin tones;
+- flags;
+- ZWJ sequences;
+- recently added Unicode emoji.
 
 ## Consequences
 
-Until this spike is measured:
+Until this spike is resolved:
 
-- the corpus implementation can be complete while rendered coverage is not;
+- corpus completeness and rendered coverage are intentionally distinct;
 - Q013 host QA remains blocked;
-- font work is considered part of the critical path, not visual polish.
-
-## Revisit when
-
-Revisit immediately after the first target-host build can produce:
-
-- baseline first-UI timing;
-- representative rendering coverage;
-- font initialization comparisons.
+- system-font discovery is explicitly not part of the baseline;
+- font optimization is treated as performance engineering, not visual polish.
