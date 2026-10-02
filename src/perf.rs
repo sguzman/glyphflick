@@ -1,57 +1,86 @@
-use std::time::{Duration, Instant};
+#[cfg(feature = "timing")]
+use std::time::Instant;
+
+#[cfg(feature = "timing")]
+pub type Stamp = Instant;
+
+#[cfg(not(feature = "timing"))]
+#[derive(Clone, Copy)]
+pub struct Stamp;
 
 #[derive(Clone, Copy)]
 pub struct Timing {
-    enabled: bool,
+    #[cfg(feature = "timing")]
     process_start: Instant,
 }
 
 impl Timing {
-    pub fn from_env(process_start: Instant) -> Self {
+    #[inline(always)]
+    pub fn new() -> Self {
         Self {
-            enabled: std::env::var_os("GLYPHFLICK_TIMING").is_some(),
-            process_start,
+            #[cfg(feature = "timing")]
+            process_start: Instant::now(),
         }
     }
 
-    #[inline]
-    pub fn report_corpus(self, elapsed: Duration, glyph_count: usize) {
-        if self.enabled {
-            eprintln!(
-                "glyphflick timing corpus_init_us={} glyphs={glyph_count}",
-                elapsed.as_micros()
-            );
+    #[inline(always)]
+    pub fn stamp(self) -> Stamp {
+        #[cfg(feature = "timing")]
+        {
+            Instant::now()
+        }
+
+        #[cfg(not(feature = "timing"))]
+        {
+            Stamp
         }
     }
 
-    #[inline]
+    #[inline(always)]
+    pub fn report_corpus(self, start: Stamp, glyph_count: usize) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing corpus_init_us={} glyphs={glyph_count}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start, glyph_count);
+    }
+
+    #[inline(always)]
     pub fn mark_first_ui(self) {
-        if self.enabled {
-            report("startup_to_first_ui", self.process_start.elapsed());
-        }
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing startup_to_first_ui_us={}",
+            self.process_start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = self;
     }
 
-    #[inline]
-    pub fn report_search(self, elapsed: Duration, result_count: usize) {
-        if self.enabled {
-            eprintln!(
-                "glyphflick timing search_us={} results={result_count}",
-                elapsed.as_micros()
-            );
-        }
+    #[inline(always)]
+    pub fn report_search(self, start: Stamp, result_count: usize) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing search_us={} results={result_count}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start, result_count);
     }
 
-    #[inline]
-    pub fn report_clipboard(self, elapsed: Duration) {
-        if self.enabled {
-            report("clipboard_establish", elapsed);
-        }
-    }
-}
+    #[inline(always)]
+    pub fn report_clipboard(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing clipboard_establish_us={}",
+            start.elapsed().as_micros()
+        );
 
-fn report(label: &str, elapsed: Duration) {
-    eprintln!(
-        "glyphflick timing {label}_us={}",
-        elapsed.as_micros()
-    );
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
 }
