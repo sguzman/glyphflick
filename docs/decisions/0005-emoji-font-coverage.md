@@ -1,6 +1,6 @@
 # ADR 0005: Map one color emoji font; do not enumerate system fonts
 
-- Status: Accepted for target QA; target latency measurement pending
+- Status: Accepted
 - Date: 2026-10-02
 
 ## Context
@@ -93,13 +93,18 @@ Deferred. Existing egui experiments use multi-megabyte atlas assets and eagerly 
 
 Not selected. Mapping the distro-provided font avoids inflating the binary and avoids copying the entire file into process memory on startup.
 
-## Remaining work
+## Target-host validation
 
-Before Q008A is fully done:
+The target EndeavourOS/Arch host validated the selected strategy:
 
-- measure font initialization and first visible frame on the target host;
-- verify the target Arch Unicode 17 font renders the newest corpus entries;
-- verify the target-host warning path if Noto Color Emoji is not installed.
+- Noto Color Emoji loaded from the first Arch lookup path;
+- 1,438 / 1,438 visible scalars covered;
+- 3,944 / 3,944 corpus entries scalar-sufficient;
+- representative basic, skin-tone, flag, and ZWJ-family sequences rasterized;
+- font initialization median: 19 µs;
+- clipboard persistence after Glyphflick process exit passed.
+
+The remaining startup optimization work is therefore outside this ADR: the measured dominant launch cost is Wayland/EGL/OpenGL initialization, not emoji font setup.
 
 ## Consequences
 
