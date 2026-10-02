@@ -12,6 +12,7 @@ When asked to continue work, inspect the repository, make coherent changes, vali
 
 Never violate these casually:
 
+- **Latency is the primary product constraint. Glyphflick exists because the alternative workflow is too slow and disruptive.**
 - Glyphflick is one-shot by default.
 - Successful selection means copy, dismiss, and return control to the prior task.
 - Clipboard persistence must remain correct after visible UI dismissal.
@@ -22,8 +23,25 @@ Never violate these casually:
 - Hyprland is a deployment target, not an architectural dependency.
 - The repository does not own the user's compositor configuration.
 - Emoji are the first dataset, not the permanent conceptual boundary.
-- Startup cost matters.
 - Configuration is optional, never prerequisite ceremony.
+
+## Latency gate
+
+Treat every operation added before the first useful frame as hostile until justified.
+
+In particular:
+
+- do not add startup filesystem I/O casually;
+- do not add subprocesses to the launch path;
+- do not add an async runtime casually;
+- do not add config parsing merely because configuration might exist later;
+- do not add caches whose construction cost has not been measured;
+- do not add a dependency to save implementation effort if it materially broadens the runtime;
+- do not claim an optimization without before/after measurements once benchmarking is available.
+
+A feature that measurably regresses startup or selection latency must justify that regression against a core requirement. Feature breadth does not outrank responsiveness.
+
+Production instrumentation must be zero-cost when disabled. Benchmark-only code belongs behind compile-time features where practical.
 
 ## Repository workflow
 
@@ -64,6 +82,8 @@ Do:
 - Separate corpus/search logic from egui rendering.
 - Make dismissal semantics testable at the application boundary.
 - Benchmark launch/search before adding heavyweight dependencies.
+- Prefer allocation reuse in repeated interaction paths.
+- Keep keyboard navigation and other hot-path state transitions allocation-free.
 
 ## Definition of done
 
