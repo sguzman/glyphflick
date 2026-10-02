@@ -126,10 +126,10 @@ The original slim monochrome-font baseline at commit `b8ff9f1` produced a stripp
 
 The selected color-font implementation at commit `d6a44ab` produced:
 
-- 6,180,192 bytes;
+- 6,180,672 bytes;
 - 5.894 MiB.
 
-That is 277,376 bytes smaller, about a 4.3% reduction, despite adding color-font rendering support. The reduction comes from dropping the embedded monochrome emoji faces and mapping the host's Noto Color Emoji file instead.
+That is 276,896 bytes smaller, about a 4.3% reduction, despite adding color-font rendering support. The timing/QA hooks remain compiled out of the normal release; the post-probe release measurement stayed at 5.894 MiB. The reduction comes from dropping the embedded monochrome emoji faces and mapping the host's Noto Color Emoji file instead.
 
 These are CI-host size measurements, not target-machine latency measurements. The runtime-budget workflow rejects X11, GLX, wgpu, arboard, and smithay-clipboard if they re-enter the runtime dependency graph and now runs on source changes as well as dependency changes.
 
