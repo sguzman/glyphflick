@@ -15,6 +15,16 @@ impl Timing {
     }
 
     #[inline]
+    pub fn report_corpus(self, elapsed: Duration, glyph_count: usize) {
+        if self.enabled {
+            eprintln!(
+                "glyphflick timing corpus_init_us={} glyphs={glyph_count}",
+                elapsed.as_micros()
+            );
+        }
+    }
+
+    #[inline]
     pub fn mark_first_ui(self) {
         if self.enabled {
             report("startup_to_first_ui", self.process_start.elapsed());
