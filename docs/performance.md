@@ -119,12 +119,19 @@ Cold and repeated/warm launches must be reported separately.
 
 ## Current automated baseline
 
-At commit `b8ff9f1`, the dedicated Linux runtime-budget workflow produced a stripped release binary of:
+The original slim monochrome-font baseline at commit `b8ff9f1` produced a stripped release binary of:
 
 - 6,457,568 bytes;
 - 6.158 MiB.
 
-This is a CI-host measurement, not a target-machine latency measurement. The same workflow also rejects X11, GLX, wgpu, arboard, and smithay-clipboard if they re-enter the runtime dependency graph.
+The selected color-font implementation at commit `d6a44ab` produced:
+
+- 6,180,192 bytes;
+- 5.894 MiB.
+
+That is 277,376 bytes smaller, about a 4.3% reduction, despite adding color-font rendering support. The reduction comes from dropping the embedded monochrome emoji faces and mapping the host's Noto Color Emoji file instead.
+
+These are CI-host size measurements, not target-machine latency measurements. The runtime-budget workflow rejects X11, GLX, wgpu, arboard, and smithay-clipboard if they re-enter the runtime dependency graph and now runs on source changes as well as dependency changes.
 
 ## Target character
 
@@ -167,7 +174,7 @@ Potential experiments after the first build is validated:
 - virtualized grid tuning;
 - release LTO/codegen settings;
 - native clipboard backend versus helper subprocess;
-- font initialization/fallback cost;
+- direct Noto Color Emoji mmap + color-font initialization cost;
 - allocator comparison only if allocation profiling identifies it as material.
 
 ## Anti-optimizations
