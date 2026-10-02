@@ -141,7 +141,9 @@ impl ApplicationHandler for ProbeApp {
                 );
 
                 let present_start = Instant::now();
-                buffer.present().expect("failed to present softbuffer frame");
+                buffer
+                    .present()
+                    .expect("failed to present softbuffer frame");
                 eprintln!(
                     "glyphflick softbuffer timing present_call_us={}",
                     present_start.elapsed().as_micros()
