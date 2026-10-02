@@ -20,14 +20,16 @@ Items are ordered unless a dependency or newly discovered defect requires reprio
 
 **Status: CODE COMPLETE / QA PENDING**
 
-The native Rust/egui binary skeleton now exists with deliberately trimmed eframe features.
+The native Rust/egui binary now uses a project-owned Wayland/EGL runtime rather than eframe.
 
 Acceptance:
 
 - [ ] repository builds on target Linux environment;
 - [x] one binary named `glyphflick`;
 - [x] window path requires no network/configuration setup;
-- [x] app/corpus/search/clipboard/performance boundaries exist.
+- [x] app/corpus/search/clipboard/performance/runtime boundaries exist;
+- [x] eframe removed from the runtime dependency graph;
+- [x] Wayland-only winit + EGL-only glutin stack is explicit.
 
 Validation note: repository-side execution is not currently available through the project tooling, so target-host build validation remains pending.
 
@@ -194,7 +196,11 @@ Currently instrumented:
 
 Still needed:
 
-- [ ] first actually presented frame methodology;
+- [x] first successful EGL buffer-swap timing proxy;
+- [x] Wayland/EGL/GL setup timing;
+- [x] egui runtime initialization timing;
+- [x] whether zero swap interval was actually accepted;
+- [ ] compositor-observed first-visible-frame methodology;
 - [ ] visible dismissal measurement;
 - [ ] binary size;
 - [ ] peak memory;
@@ -207,11 +213,16 @@ Still needed:
 
 Already applied before measurement because they remove obviously unused machinery:
 
-- [x] eframe default features disabled;
-- [x] Wayland enabled, X11 omitted;
-- [x] Glow renderer enabled, wgpu omitted;
-- [x] persistence omitted;
-- [x] links/web features omitted;
+- [x] eframe removed entirely;
+- [x] direct egui_glow runtime;
+- [x] Wayland-only winit; X11 and Wayland CSD theme machinery omitted;
+- [x] EGL-only glutin/glutin-winit; GLX omitted;
+- [x] wgpu omitted;
+- [x] egui-winit OS clipboard feature omitted, removing arboard/smithay clipboard startup initialization;
+- [x] link-opening support omitted;
+- [x] eframe PNG application-icon path omitted;
+- [x] event loop uses Wait rather than Poll;
+- [x] swap interval explicitly requests DontWait;
 - [x] no async runtime;
 - [x] no logging/profiling framework;
 - [x] no config parsing/filesystem I/O on launch;
