@@ -69,7 +69,7 @@ if grep -q 'swap_interval_dont_wait=false' "$raw_log"; then
   echo "warning: EGL rejected SwapInterval::DontWait on this host" >&2
 fi
 
-summary_file="target/glyphflick-target-probe.txt"
+summary_file="$(pwd)/target/glyphflick-target-probe.txt"
 : >"$summary_file"
 
 summarize_metric() {
