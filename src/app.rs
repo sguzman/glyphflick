@@ -26,7 +26,9 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
     pub fn new(cc: &eframe::CreationContext<'_>, clipboard: B, timing: Timing) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
 
+        let corpus_start = Instant::now();
         let corpus = Corpus::emoji();
+        timing.report_corpus(corpus_start.elapsed(), corpus.len());
         let results = SearchResults::new(&corpus);
 
         Self {
