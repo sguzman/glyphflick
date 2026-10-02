@@ -133,6 +133,25 @@ That is 276,896 bytes smaller, about a 4.3% reduction, despite adding color-font
 
 These are CI-host size measurements, not target-machine latency measurements. The runtime-budget workflow rejects X11, GLX, wgpu, arboard, and smithay-clipboard if they re-enter the runtime dependency graph and now runs on source changes as well as dependency changes.
 
+## Target-host baseline — EndeavourOS / Wayland
+
+The first target run used seven real Wayland launches through `scripts/target-probe.sh`.
+
+Median values:
+
+- Wayland/EGL/OpenGL initialization: 32.618 ms;
+- egui runtime initialization: 3.224 ms;
+- emoji font initialization: 19 µs;
+- corpus initialization: 25 µs;
+- process start to first UI pass: 38.362 ms;
+- process start to first successful EGL buffer swap: 53.369 ms.
+
+Observed ranges were tight: first-swap completion ranged from 52.288 ms to 54.769 ms. EGL/GL initialization is therefore the dominant measured launch component, not font or corpus work.
+
+The target host also reported `SwapInterval::DontWait` accepted on all measured launches, complete 1,438 / 1,438 visible scalar coverage, 3,944 / 3,944 corpus entry coverage, representative complex emoji rasterization success, and clipboard persistence success.
+
+The first measured launch is reported separately in the probe output but is not treated as a controlled cold-cache measurement.
+
 ## Target character
 
 Until target hardware measurements exist, numerical thresholds are provisional.
