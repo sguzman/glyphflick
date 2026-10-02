@@ -7,6 +7,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "src/**"
+      - "scripts/**"
       - ".github/workflows/ci.yml"
   pull_request:
     paths:
@@ -48,6 +49,9 @@ jobs:
 
       - name: Format
         run: cargo fmt --all -- --check
+
+      - name: Validate target probe shell
+        run: bash -n scripts/target-probe.sh
 
       - name: Check
         run: cargo check --locked
