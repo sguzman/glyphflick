@@ -99,9 +99,11 @@ Before Q008A is fully done:
 
 - measure font initialization and first visible frame on the target host;
 - verify the target Arch Unicode 17 font renders the newest corpus entries;
-- decide the user-visible behavior when Noto Color Emoji is not installed.
+- verify the target-host warning path if Noto Color Emoji is not installed.
 
 ## Consequences
+
+If the known Noto Color Emoji paths are absent, Glyphflick keeps search/copy data available but shows an explicit rendering-unavailable warning. It does not silently claim successful emoji rendering.
 
 The selected design intentionally accepts a Linux package dependency for full color emoji rendering in exchange for:
 
