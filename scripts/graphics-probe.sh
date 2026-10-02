@@ -61,6 +61,7 @@ summarize_metric() {
 run_mode() {
   local label="$1"
   local force_gles="$2"
+  local alpha_zero="$3"
   local log
   log="$(mktemp)"
 
@@ -69,8 +70,14 @@ run_mode() {
 
   for ((run = 1; run <= runs; run++)); do
     printf -- "--- run %d ---\n" "$run" >>"$log"
-    if [[ "$force_gles" == true ]]; then
+    if [[ "$force_gles" == true && "$alpha_zero" == true ]]; then
+      GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 GLYPHFLICK_FORCE_GLES=1 GLYPHFLICK_ALPHA_ZERO=1 \
+        ./target/release/glyphflick 2>>"$log"
+    elif [[ "$force_gles" == true ]]; then
       GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 GLYPHFLICK_FORCE_GLES=1 \
+        ./target/release/glyphflick 2>>"$log"
+    elif [[ "$alpha_zero" == true ]]; then
+      GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 GLYPHFLICK_ALPHA_ZERO=1 \
         ./target/release/glyphflick 2>>"$log"
     else
       GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 \
@@ -78,9 +85,11 @@ run_mode() {
     fi
   done
 
-  local api
+  local api config
   api="$(sed -nE 's/.*context_api=(.*)/\1/p' "$log" | sort -u | paste -sd ',' -)"
+  config="$(sed -nE 's/.*(gl_config_alpha=.*)/\1/p' "$log" | sort -u | paste -sd ',' -)"
   echo "$label context_api=$api" | tee -a "$report"
+  echo "$label $config" | tee -a "$report"
 
   if grep -q 'system_emoji_mapped=false' "$log"; then
     echo "$label failed to map Noto Color Emoji" >&2
@@ -125,12 +134,16 @@ run_mode() {
   echo
 } >>"$report"
 
-echo "[2/3] default context"
-run_mode default false
+echo "[2/4] default context"
+run_mode default false false
 
 echo
-echo "[3/3] forced GLES context"
-run_mode gles true
+echo "[3/4] forced GLES context"
+run_mode gles true false
+
+echo
+echo "[4/4] opaque alpha-zero config"
+run_mode alpha0 false true
 
 echo
 echo "probe_report=$report"
