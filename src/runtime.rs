@@ -22,7 +22,10 @@ const WINDOW_HEIGHT: f64 = 440.0;
 const CLEAR_COLOR: [f32; 4] = [0.03, 0.03, 0.03, 1.0];
 
 pub fn run(timing: Timing) -> Result<(), winit::error::EventLoopError> {
+    let event_loop_start = timing.stamp();
     let event_loop = EventLoop::new()?;
+    timing.report_event_loop_init(event_loop_start);
+
     let mut runtime = Runtime::new(timing);
     event_loop.run_app(&mut runtime)
 }
@@ -56,6 +59,7 @@ impl ApplicationHandler for Runtime {
         }
 
         event_loop.set_control_flow(ControlFlow::Wait);
+        self.timing.mark_resumed();
 
         let runtime_start = self.timing.stamp();
         let (gl_window, gl) = create_display(event_loop, self.timing);
