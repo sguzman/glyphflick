@@ -186,6 +186,25 @@ mod tests {
             corpus.len()
         );
 
+        let galley = ctx.fonts_mut(|fonts| {
+            fonts.layout_no_wrap(
+                "🚀🤖🦀".to_owned(),
+                font_id.clone(),
+                egui::Color32::WHITE,
+            )
+        });
+        let rasterized = galley
+            .rows
+            .iter()
+            .flat_map(|row| row.glyphs.iter())
+            .filter(|glyph| !is_sequence_control(glyph.chr))
+            .all(|glyph| !glyph.uv_rect.is_nothing());
+        assert!(
+            rasterized,
+            "pinned outline font has charmap entries that egui 0.36.2 cannot rasterize"
+        );
+        println!("glyphflick pinned outline probe: representative_rasterization=ok");
+
         if !missing.is_empty() {
             let sample = missing
                 .iter()
