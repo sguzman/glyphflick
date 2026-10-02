@@ -2,6 +2,7 @@ use core::num::NonZeroU32;
 use std::ffi::CString;
 use std::sync::Arc;
 
+use glutin::config::GlConfig as _;
 use glutin::context::{GlContext as _, NotCurrentGlContext as _};
 use glutin::display::{GetGlDisplay as _, GlDisplay as _};
 use glutin::prelude::GlSurface as _;
@@ -185,11 +186,14 @@ impl GlutinWindowContext {
     fn new(event_loop: &ActiveEventLoop, timing: Timing) -> Self {
         let window_attributes = window_attributes();
 
-        let config_template = glutin::config::ConfigTemplateBuilder::new()
+        let mut config_template = glutin::config::ConfigTemplateBuilder::new()
             .prefer_hardware_accelerated(Some(true))
             .with_depth_size(0)
             .with_stencil_size(0)
             .with_transparency(false);
+        if timing.alpha_zero() {
+            config_template = config_template.with_alpha_size(0);
+        }
 
         let display_start = timing.stamp();
         let (mut window, gl_config) = glutin_winit::DisplayBuilder::new()
@@ -202,6 +206,14 @@ impl GlutinWindowContext {
             })
             .expect("failed to create EGL configuration");
         timing.report_display_build(display_start);
+        timing.report_gl_config(
+            gl_config.alpha_size(),
+            gl_config.depth_size(),
+            gl_config.stencil_size(),
+            gl_config.num_samples(),
+            gl_config.hardware_accelerated(),
+            gl_config.api(),
+        );
 
         let gl_display = gl_config.display();
 
