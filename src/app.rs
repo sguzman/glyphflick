@@ -1,5 +1,4 @@
 use std::ops::Range;
-use std::time::Instant;
 
 use eframe::egui;
 
@@ -32,9 +31,9 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
     pub fn new(cc: &eframe::CreationContext<'_>, clipboard: B, timing: Timing) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
 
-        let corpus_start = Instant::now();
+        let corpus_start = timing.stamp();
         let corpus = Corpus::emoji();
-        timing.report_corpus(corpus_start.elapsed(), corpus.len());
+        timing.report_corpus(corpus_start, corpus.len());
         let results = SearchResults::new(&corpus);
 
         Self {
@@ -54,12 +53,11 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
     }
 
     fn refresh_results(&mut self) {
-        let start = Instant::now();
+        let start = self.timing.stamp();
         self.results.update(&self.corpus, &self.query);
         self.selection.reset();
         self.scroll_row = Some(0);
-        self.timing
-            .report_search(start.elapsed(), self.results.len());
+        self.timing.report_search(start, self.results.len());
     }
 
     fn handle_navigation(&mut self, ctx: &egui::Context) {
@@ -112,10 +110,10 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
     }
 
     fn commit(&mut self, ctx: &egui::Context, text: &'static str) {
-        let start = Instant::now();
+        let start = self.timing.stamp();
         match self.clipboard.copy(text) {
             Ok(()) => {
-                self.timing.report_clipboard(start.elapsed());
+                self.timing.report_clipboard(start);
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
             Err(error) => {
