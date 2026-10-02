@@ -29,6 +29,11 @@ pub struct GlyphflickApp<B> {
 impl<B: ClipboardBackend> GlyphflickApp<B> {
     pub fn new(ctx: &egui::Context, clipboard: B, timing: Timing) -> Self {
         ctx.set_visuals(egui::Visuals::dark());
+        ctx.style_mut(|style| {
+            style.animation_time = 0.0;
+            style.interaction.tooltip_delay = 0.0;
+            style.interaction.show_tooltips_only_when_still = false;
+        });
 
         let corpus_start = timing.stamp();
         let corpus = Corpus::emoji();
