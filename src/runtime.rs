@@ -61,7 +61,6 @@ impl ApplicationHandler for Runtime {
         let (gl_window, gl) = create_display(event_loop, self.timing);
         self.timing.report_runtime_init(runtime_start);
 
-        gl_window.window().set_visible(true);
 
         let egui_start = self.timing.stamp();
         let egui_glow = egui_glow::EguiGlow::new(event_loop, Arc::new(gl), None, None, false);
@@ -275,7 +274,6 @@ fn window_attributes() -> WindowAttributes {
         .with_max_inner_size(size)
         .with_resizable(false)
         .with_decorations(false)
-        .with_visible(false)
         .with_name("glyphflick", "glyphflick")
 }
 
