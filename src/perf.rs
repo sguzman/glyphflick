@@ -14,15 +14,17 @@ pub struct Timing {
     process_start: Instant,
 }
 
-impl Timing {
+impl Default for Timing {
     #[inline(always)]
-    pub fn new() -> Self {
+    fn default() -> Self {
         Self {
             #[cfg(feature = "timing")]
             process_start: Instant::now(),
         }
     }
+}
 
+impl Timing {
     #[inline(always)]
     pub fn stamp(self) -> Stamp {
         #[cfg(feature = "timing")]
