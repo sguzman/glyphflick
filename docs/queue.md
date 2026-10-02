@@ -18,20 +18,21 @@ Items are ordered unless a dependency or newly discovered defect requires reprio
 
 ## Q001 — Bootstrap Rust application
 
-**Status: CODE COMPLETE / QA PENDING**
+**Status: AUTOMATED VALIDATION GREEN / TARGET QA PENDING**
 
-The native Rust/egui binary now uses a project-owned Wayland/EGL runtime rather than eframe.
+The native Rust/egui binary uses a project-owned Wayland/EGL runtime rather than eframe.
 
 Acceptance:
 
-- [ ] repository builds on target Linux environment;
+- [x] repository compiles in Linux CI with Wayland/EGL dependencies;
+- [ ] release build executes on target Wayland environment;
 - [x] one binary named `glyphflick`;
 - [x] window path requires no network/configuration setup;
 - [x] app/corpus/search/clipboard/performance/runtime boundaries exist;
 - [x] eframe removed from the runtime dependency graph;
 - [x] Wayland-only winit + EGL-only glutin stack is explicit.
 
-Validation note: repository-side execution is not currently available through the project tooling, so target-host build validation remains pending.
+Automated validation passes formatting, `cargo check`, unit tests, and strict Clippy. Real Wayland execution remains target-host QA.
 
 ## Q002 — Sample corpus vertical slice
 
@@ -41,7 +42,7 @@ The implementation skipped the temporary sample dataset and went directly to the
 
 ## Q003 — Basic search
 
-**Status: CODE COMPLETE / VALIDATION PENDING**
+**Status: DONE**
 
 Acceptance:
 
@@ -50,7 +51,7 @@ Acceptance:
 - [x] matching is ASCII case-insensitive for English names/shortcodes;
 - [x] search logic has unit tests in-tree;
 - [x] UI does not own ranking logic;
-- [ ] tests executed on target/build environment.
+- [x] tests executed successfully in CI.
 
 ## Q004 — Clipboard backend spike
 
@@ -83,7 +84,7 @@ Acceptance:
 
 ## Q006 — Real emoji corpus adapter
 
-**Status: CODE COMPLETE / VALIDATION PENDING**
+**Status: DONE**
 
 Acceptance:
 
@@ -93,13 +94,13 @@ Acceptance:
 - [x] skin-tone variants included;
 - [x] multi-codepoint sequences remain opaque exact strings;
 - [x] third-party emoji type remains private to corpus adapter internals;
-- [ ] corpus tests executed.
+- [x] corpus tests executed successfully in CI.
 
 Implementation intentionally stores only static emoji references instead of allocating owned name/text copies at startup.
 
 ## Q007 — Search relevance v1
 
-**Status: CODE COMPLETE / VALIDATION PENDING**
+**Status: DONE**
 
 Implemented deterministic bucket ranking without per-query sorting:
 
@@ -117,7 +118,7 @@ Acceptance:
 - [x] tests cover exact shortcode, case, canonical name, substring;
 - [x] no fuzzy search;
 - [x] result vectors are allocation-reused;
-- [ ] tests executed.
+- [x] tests executed successfully in CI.
 
 ## Q008 — Virtualized result grid
 
@@ -145,7 +146,7 @@ Acceptance:
 - [x] query edits reset result selection and return to the top;
 - [x] Enter commits the active result, or first ranked result before navigation;
 - [x] Escape cancels;
-- [x] navigation has unit tests in-tree;
+- [x] navigation has unit tests in-tree and green in CI;
 - [ ] keyboard behavior verified on target host.
 
 ## Q008A — Emoji font coverage and startup-cost spike
@@ -209,7 +210,7 @@ Still needed:
 
 ## Q012 — Startup optimization pass
 
-**Status: IN PROGRESS EARLY**
+**Status: IN PROGRESS / AUTOMATED BASELINE GREEN**
 
 Already applied before measurement because they remove obviously unused machinery:
 
@@ -230,13 +231,15 @@ Already applied before measurement because they remove obviously unused machiner
 - [x] fat LTO;
 - [x] one codegen unit;
 - [x] panic abort;
-- [x] symbol stripping.
+- [x] symbol stripping;
+- [x] CI rejects X11, GLX, wgpu, and generic OS-clipboard dependencies if they re-enter the graph;
+- [x] dependency/size budget workflow isolated from ordinary source commits.
 
 Measurement-dependent work remains intentionally open.
 
 ## Q013 — Real Wayland QA
 
-**Status: BLOCKED ON Q008A/Q011/Q012**
+**Status: BLOCKED ON Q008A/Q011/Q012 / AUTOMATED BUILD GREEN**
 
 Manual host verification:
 
