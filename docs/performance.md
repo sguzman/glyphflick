@@ -216,3 +216,24 @@ Do not:
 Performance claims in commits/docs should include the environment and measurement method when possible.
 
 "Faster" without a baseline is not a result.
+
+
+### Graphics A/B — target host
+
+A seven-launch target A/B isolated the graphics startup and first-frame costs.
+
+Median results:
+
+| Mode | EGL display/config/window | Graphics init | First egui run | GL paint | Swap call | First swap complete |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| OpenGL, alpha 8 | 31.139 ms | 34.467 ms | 12.413 ms | 2.534 ms | 0.844 ms | 55.719 ms |
+| GLES, alpha 8 | 30.633 ms | 33.827 ms | 12.083 ms | 2.383 ms | 0.793 ms | 54.387 ms |
+| OpenGL, alpha 0 | 30.017 ms | 33.306 ms | 12.394 ms | 2.419 ms | 0.793 ms | 54.625 ms |
+
+Interpretation:
+
+- EGL display/config/window creation is the dominant startup cost at roughly 30–31 ms.
+- The first egui UI pass is the second-largest cost at roughly 12 ms.
+- GL paint is roughly 2.4–2.5 ms and the first swap call itself is under 1 ms.
+- GLES improved the repeated median but showed a one-off 12.321 ms egui runtime initialization spike on its first measured launch, so it is not promoted from one series.
+- Alpha-zero is appropriate for Glyphflick's intentionally opaque window and improved the median without changing the context API. It is promoted to the production EGL template.
