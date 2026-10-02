@@ -1,6 +1,6 @@
 # ADR 0004: Strip the runtime to the critical path
 
-- Status: Accepted
+- Status: Accepted; runtime implementation refined by ADR 0006
 - Date: 2026-10-02
 
 ## Context
@@ -11,31 +11,38 @@ A transient picker pays startup cost on every invocation. Dependencies and initi
 
 ## Decision
 
-The initial runtime is intentionally austere.
+The runtime is intentionally austere.
 
-### eframe features
+### Window/render stack
 
-Use eframe 0.36.2 with default features disabled and enable only:
+Use:
 
-- `default_fonts`;
-- `glow`;
-- `wayland`.
+- egui 0.36.2;
+- egui_glow 0.36.2;
+- winit 0.30.13 with Wayland only;
+- glutin/glutin-winit with EGL + Wayland only.
 
-Do not enable the default wgpu renderer or X11 backend in the initial Wayland-targeted binary.
+Do not use eframe, wgpu, X11, GLX, or egui-winit's OS clipboard feature.
+
+Use an event-driven `ControlFlow::Wait` loop rather than continuous polling.
+
+Request `SwapInterval::DontWait` so presentation is not intentionally delayed to a refresh boundary.
 
 ### Runtime omissions
 
 The initial binary has no:
 
 - async runtime;
-- application logging framework;
+- application logging setup;
 - persistence framework;
 - configuration parser;
 - startup filesystem scan;
 - network stack;
 - fuzzy-search engine;
 - database;
-- resident Glyphflick daemon.
+- resident Glyphflick daemon;
+- startup clipboard provider;
+- PNG application-icon path.
 
 ### Release profile
 
@@ -47,13 +54,13 @@ Use:
 - abort-on-panic;
 - stripped symbols.
 
-Compile time is allowed to be worse if it buys a smaller/faster release artifact.
+Compile time is allowed to be worse if it buys a leaner release artifact.
 
 ### Search
 
 Use a linear corpus scan with allocation-reused fixed relevance buckets.
 
-Do not build a fuzzy index or allocate normalized copies of every emoji name at startup without measurements showing that query evaluation is a meaningful bottleneck.
+Do not build a fuzzy index or allocate normalized copies of every emoji name at startup without measurements showing query evaluation is a meaningful bottleneck.
 
 ### Keyboard navigation
 
@@ -67,47 +74,43 @@ Do not probe or start `wl-copy` at application launch.
 
 Invoke it only after commit so clipboard machinery contributes nothing to the launch path.
 
+Do not enable egui-winit's OS clipboard feature merely to support rare search-field paste. If external paste becomes important, implement it on demand so its cost is paid only when invoked.
+
 ### Instrumentation
 
 Production timing instrumentation is compiled out.
 
-The Cargo feature `timing` opts a benchmark build into microsecond probes. The normal build therefore performs no profiler environment lookup and no timing-clock reads in corpus/search/clipboard hot paths.
-
-## Rationale
-
-These choices remove clearly unused work without pretending we already know the remaining bottleneck.
-
-Current eframe documentation states that the default native renderer is wgpu and that Glow can materially reduce binary size. A smaller dependency/rendering path is the better first hypothesis for a process-per-invocation utility, but renderer choice remains benchmark-revisitable.
+The Cargo feature `timing` opts a benchmark build into microsecond probes. The normal build performs no profiler environment lookup and no timing-clock reads in corpus/search/clipboard hot paths.
 
 ## Non-decision: custom allocator
 
-egui documentation notes that alternative allocators can improve some application workloads.
-
-Glyphflick will not add mimalloc/talc/jemalloc yet because allocator initialization and binary impact can matter to cold startup. This must be measured on the actual picker before adoption.
+Do not add mimalloc/talc/jemalloc based on generic benchmark folklore. Measure the actual picker first.
 
 ## Non-decision: daemon
 
-A resident process could eventually reduce repeated invocation latency, but it would fundamentally alter the product/process model and consume resources continuously.
+A resident process could reduce repeated invocation latency but fundamentally changes resource/lifecycle behavior.
 
-Do not introduce a daemon until measured cold/warm launch data proves process startup is the dominant unacceptable cost and lighter approaches have been exhausted.
+Do not introduce a daemon until measured cold/warm data proves process startup is the unacceptable dominant cost and lighter approaches have been exhausted.
 
 ## Consequences
 
 Positive:
 
-- narrower Linux runtime;
-- less renderer/dependency machinery;
-- no avoidable launch I/O;
-- normal release builds pay no instrumentation overhead;
-- benchmark builds can measure the remaining cost cleanly.
+- no unused eframe application layer;
+- no eframe-forced OS clipboard initialization;
+- no X11/GLX/wgpu paths;
+- no intentional vsync wait;
+- event-driven idle behavior;
+- production instrumentation overhead is compiled away.
 
 Tradeoffs:
 
 - initial binary is Wayland-only;
-- host needs a working `wl-copy` for the first clipboard backend;
-- bundled-font cost remains because glyph rendering requires it;
-- assumptions about Glow must be validated against real launch measurements.
+- host needs working EGL/OpenGL;
+- host needs `wl-copy` for the first clipboard backend;
+- external Ctrl+V paste into search is deferred until an on-demand path exists;
+- custom runtime code is now ours to maintain.
 
 ## Revisit when
 
-Revisit after Q011 produces target-machine cold/warm launch data and renderer/clipboard timing.
+Revisit after target-machine measurements identify the actual dominant costs.
