@@ -26,9 +26,11 @@ report="target/glyphflick-graphics-probe.txt"
 echo "glyphflick graphics probe"
 echo "wayland_display=$WAYLAND_DISPLAY"
 echo "runs_per_mode=$runs"
+echo "git_commit=$(git rev-parse --short=12 HEAD)"
+echo "rustc=$(rustc --version)"
 echo
 
-echo "[1/3] building timing binary"
+echo "[1/4] building timing binary"
 cargo build --release --locked --features timing
 
 summarize_metric() {
@@ -131,6 +133,8 @@ run_mode() {
   echo "Glyphflick graphics probe"
   echo "Wayland display: $WAYLAND_DISPLAY"
   echo "Launches per mode: $runs"
+  echo "Git commit: $(git rev-parse HEAD)"
+  echo "Rust: $(rustc --version)"
   echo
 } >>"$report"
 
