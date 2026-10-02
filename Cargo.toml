@@ -9,6 +9,7 @@ repository = "https://github.com/sguzman/glyphflick"
 [features]
 default = []
 timing = []
+softbuffer-probe = ["dep:softbuffer"]
 
 [dependencies]
 egui = { git = "https://github.com/emilk/egui.git", rev = "f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9", default-features = false }
@@ -19,7 +20,13 @@ epaint_default_fonts = { git = "https://github.com/emilk/egui.git", rev = "f2de6
 glutin = { version = "=0.32.3", default-features = false, features = ["egl", "wayland"] }
 glutin-winit = { version = "=0.5.0", default-features = false, features = ["egl", "wayland"] }
 memmap2 = "=0.9.11"
+softbuffer = { version = "=0.4.8", default-features = false, features = ["wayland"], optional = true }
 winit = { version = "=0.30.13", default-features = false, features = ["rwh_06", "wayland"] }
+
+[[bin]]
+name = "glyphflick-softbuffer-probe"
+path = "src/bin/softbuffer_probe.rs"
+required-features = ["softbuffer-probe"]
 
 [profile.release]
 opt-level = 3
