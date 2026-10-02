@@ -1,0 +1,60 @@
+name: Runtime Budget
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/runtime-budget.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: glyphflick-runtime-budget-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  budget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1-mesa-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            pkg-config
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve dependencies
+        run: cargo generate-lockfile
+
+      - name: Reject forbidden runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          tree="$(cargo tree --locked --prefix none)"
+          forbidden='^(arboard|smithay-clipboard|x11-dl|x11rb|glutin_glx_sys|wgpu)( |$)'
+          if grep -E "$forbidden" <<<"$tree"; then
+            echo "Forbidden latency/platform dependency detected"
+            exit 1
+          fi
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Report release binary size
+        run: |
+          bytes="$(stat -c %s target/release/glyphflick)"
+          echo "glyphflick_release_bytes=$bytes"
+          echo "glyphflick_release_mib=$(awk "BEGIN { printf \"%.3f\", $bytes / 1048576 }")"
