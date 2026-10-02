@@ -25,11 +25,13 @@ pub struct GlyphflickApp<B> {
     visible_rows: Range<usize>,
     scroll_row: Option<usize>,
     timing: Timing,
+    emoji_font: egui::FontId,
 }
 
 impl<B: ClipboardBackend> GlyphflickApp<B> {
     pub fn new(ctx: &egui::Context, clipboard: B, timing: Timing) -> Self {
         fonts::install(ctx);
+        let emoji_font = fonts::emoji_font_id(GLYPH_SIZE);
         ctx.set_visuals(egui::Visuals::dark());
         ctx.all_styles_mut(|style| {
             style.animation_time = 0.0;
@@ -56,6 +58,7 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
             visible_rows: 0..0,
             scroll_row: None,
             timing,
+            emoji_font,
         }
     }
 
@@ -204,7 +207,8 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
                                     [CELL_SIZE, CELL_SIZE],
                                     egui::Button::selectable(
                                         active == Some(position),
-                                        egui::RichText::new(glyph.text()).size(GLYPH_SIZE),
+                                        egui::RichText::new(glyph.text())
+                                            .font(self.emoji_font.clone()),
                                     ),
                                 )
                                 .on_hover_text(glyph.name());
