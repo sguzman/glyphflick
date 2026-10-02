@@ -72,6 +72,18 @@ impl Timing {
     }
 
     #[inline(always)]
+    pub fn report_font_init(self, start: Stamp, system_emoji_mapped: bool) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing font_init_us={} system_emoji_mapped={system_emoji_mapped}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start, system_emoji_mapped);
+    }
+
+    #[inline(always)]
     pub fn report_corpus(self, start: Stamp, glyph_count: usize) {
         #[cfg(feature = "timing")]
         eprintln!(
