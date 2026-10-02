@@ -284,8 +284,8 @@ fn create_display(
     let gl_window = GlutinWindowContext::new(event_loop, timing);
     let gl = unsafe {
         egui_glow::glow::Context::from_loader_function(|symbol| {
-            let symbol = CString::new(symbol)
-                .expect("OpenGL procedure name unexpectedly contained NUL");
+            let symbol =
+                CString::new(symbol).expect("OpenGL procedure name unexpectedly contained NUL");
             gl_window.get_proc_address(&symbol)
         })
     };
