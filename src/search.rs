@@ -84,7 +84,10 @@ fn rank(glyph: GlyphRecord, query: &str) -> Option<usize> {
     if starts_with_ascii(name, query) {
         return Some(3);
     }
-    if glyph.shortcodes().any(|code| starts_with_ascii(code, query)) {
+    if glyph
+        .shortcodes()
+        .any(|code| starts_with_ascii(code, query))
+    {
         return Some(4);
     }
     if name
@@ -93,9 +96,7 @@ fn rank(glyph: GlyphRecord, query: &str) -> Option<usize> {
     {
         return Some(5);
     }
-    if contains_ascii(name, query)
-        || glyph.shortcodes().any(|code| contains_ascii(code, query))
-    {
+    if contains_ascii(name, query) || glyph.shortcodes().any(|code| contains_ascii(code, query)) {
         return Some(6);
     }
 
@@ -144,7 +145,9 @@ mod tests {
         let corpus = Corpus::emoji();
         let mut results = SearchResults::new(&corpus);
         results.update(&corpus, query);
-        corpus.get(results.get(0).expect("query should match")).text()
+        corpus
+            .get(results.get(0).expect("query should match"))
+            .text()
     }
 
     #[test]
