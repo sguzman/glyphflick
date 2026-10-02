@@ -27,6 +27,10 @@ fn main() -> eframe::Result {
             .with_resizable(false)
             .with_icon(egui::IconData::default()),
         renderer: eframe::Renderer::Glow,
+        glow_options: eframe::egui_glow::GlowConfiguration {
+            vsync: false,
+            ..Default::default()
+        },
         multisampling: 0,
         depth_buffer: 0,
         stencil_buffer: 0,
