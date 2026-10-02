@@ -223,7 +223,7 @@ Still needed:
 - [x] release binary size reported by runtime-budget CI (6,457,568 bytes / 6.158 MiB at commit `b8ff9f1`);
 - [ ] peak memory;
 - [ ] cold vs warm launch series;
-- [ ] documented measurements from target machine.
+- [ ] documented measurements from target machine (automated by `scripts/target-probe.sh`).
 
 ## Q012 — Startup optimization pass
 
@@ -258,7 +258,7 @@ Measurement-dependent work remains intentionally open.
 
 **Status: BLOCKED ON Q008A/Q011/Q012 / AUTOMATED BUILD GREEN**
 
-Manual host verification:
+Host verification (automated where possible by `scripts/target-probe.sh`):
 
 - launch/focus;
 - copy persistence;
