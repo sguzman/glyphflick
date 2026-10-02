@@ -54,7 +54,9 @@ fn definitions() -> (FontDefinitions, EmojiFontStatus) {
     );
 
     let status = if let Some((path, data)) = map_system_emoji_font() {
-        fonts.font_data.insert(SYSTEM_EMOJI.to_owned(), Arc::new(data));
+        fonts
+            .font_data
+            .insert(SYSTEM_EMOJI.to_owned(), Arc::new(data));
         EmojiFontStatus::Mapped(path)
     } else {
         EmojiFontStatus::Missing
