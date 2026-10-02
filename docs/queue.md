@@ -151,30 +151,40 @@ Acceptance:
 
 ## Q008A — Emoji font coverage and startup-cost spike
 
-**Status: IN PROGRESS / COVERAGE MEASUREMENT RUNNING**
+**Status: STRATEGY SELECTED / TARGET LATENCY QA PENDING**
 
 Current egui bundled fonts intentionally cover only a subset of the complete modern emoji corpus. Glyphflick must not silently present missing-glyph boxes, but it also must not solve coverage by adding expensive font discovery/parsing to every invocation without measurement.
 
-Current implementation:
+Selected implementation:
 
-- uses an explicit deterministic three-face bundle: Ubuntu Light, Noto Emoji, and emoji-icon-font;
-- removes the unused Hack face from the startup font set;
-- performs no runtime system-font discovery;
-- now has an automated shipped-font scalar coverage diagnostic in CI.
+- keeps Ubuntu Light as the isolated UI font;
+- maps one known Noto Color Emoji file directly instead of enumerating system fonts;
+- checks the Arch/EndeavourOS package path first, with a few fixed Linux fallback paths;
+- memory-maps the font instead of reading/copying the ~10 MiB file into a startup buffer;
+- renders picker cells through a dedicated emoji font family so emoji fallback cannot steal ordinary UI text;
+- uses egui's post-0.36.2 color-font renderer pinned to an exact upstream commit;
+- performs no fontconfig scan, directory walk, background enumeration, or font subprocess on launch.
+
+Automated evidence:
+
+- CI representative sequences for a basic emoji, skin tone, flag, and ZWJ family rasterize successfully;
+- Ubuntu CI's older packaged Noto font covers 1,431 / 1,438 visible corpus scalars and 3,877 / 3,944 entries;
+- the seven missing CI scalars are the seven newly added Unicode 17 standalone emoji characters;
+- the target Arch package is Noto Color Emoji 2.051 / Unicode 17 and installs at Glyphflick's first lookup path;
+- the stripped release binary fell from 6.158 MiB to 5.894 MiB while adding color-font rendering.
 
 Still evaluate:
 
-- exact shipped-font coverage against the Unicode 17 corpus;
-- startup/font initialization cost on the target host;
-- a newer deterministic emoji font only if measured coverage is materially incomplete;
-- corpus filtering only as a fallback, because silently shrinking the useful corpus is undesirable.
+- target-host font initialization and first-visible-frame cost;
+- exact target-host Unicode 17 rendering;
+- fallback behavior when Noto Color Emoji is absent.
 
 Acceptance:
 
-- [ ] representative Unicode 17 coverage quantified;
+- [x] representative Unicode 17 coverage quantified in CI;
 - [ ] startup/font initialization cost measured for viable approaches;
-- [ ] selected strategy does not perform unnecessary per-launch discovery;
-- [ ] rendering strategy documented in an ADR;
+- [x] selected strategy performs no font enumeration/discovery scan;
+- [x] rendering strategy documented in ADR 0005;
 - [ ] host rendering verified.
 
 ## Q010 — Stable window identity
