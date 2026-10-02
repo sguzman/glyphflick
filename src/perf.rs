@@ -15,6 +15,10 @@ pub struct Timing {
     #[cfg(feature = "timing")]
     exit_after_first_swap: bool,
     #[cfg(feature = "timing")]
+    exit_after_second_swap: bool,
+    #[cfg(feature = "timing")]
+    defer_grid: bool,
+    #[cfg(feature = "timing")]
     force_gles: bool,
 }
 
@@ -26,6 +30,10 @@ impl Default for Timing {
             process_start: Instant::now(),
             #[cfg(feature = "timing")]
             exit_after_first_swap: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_SWAP").is_some(),
+            #[cfg(feature = "timing")]
+            exit_after_second_swap: std::env::var_os("GLYPHFLICK_EXIT_AFTER_SECOND_SWAP").is_some(),
+            #[cfg(feature = "timing")]
+            defer_grid: std::env::var_os("GLYPHFLICK_DEFER_GRID").is_some(),
             #[cfg(feature = "timing")]
             force_gles: std::env::var_os("GLYPHFLICK_FORCE_GLES").is_some(),
         }
@@ -145,6 +153,25 @@ impl Timing {
         self.exit_after_first_swap
     }
 
+    #[cfg(feature = "timing")]
+    #[inline(always)]
+    pub const fn exit_after_second_swap(self) -> bool {
+        self.exit_after_second_swap
+    }
+
+    #[inline(always)]
+    pub const fn defer_grid(self) -> bool {
+        #[cfg(feature = "timing")]
+        {
+            self.defer_grid
+        }
+
+        #[cfg(not(feature = "timing"))]
+        {
+            false
+        }
+    }
+
     #[inline(always)]
     pub const fn force_gles(self) -> bool {
         #[cfg(feature = "timing")]
@@ -257,9 +284,27 @@ impl Timing {
 
     #[cfg(feature = "timing")]
     #[inline(always)]
+    pub fn report_second_egui_run(self, start: Stamp) {
+        eprintln!(
+            "glyphflick timing second_egui_run_us={}",
+            start.elapsed().as_micros()
+        );
+    }
+
+    #[cfg(feature = "timing")]
+    #[inline(always)]
     pub fn report_first_gl_paint(self, start: Stamp) {
         eprintln!(
             "glyphflick timing first_gl_paint_us={}",
+            start.elapsed().as_micros()
+        );
+    }
+
+    #[cfg(feature = "timing")]
+    #[inline(always)]
+    pub fn report_second_gl_paint(self, start: Stamp) {
+        eprintln!(
+            "glyphflick timing second_gl_paint_us={}",
             start.elapsed().as_micros()
         );
     }
@@ -275,9 +320,27 @@ impl Timing {
 
     #[cfg(feature = "timing")]
     #[inline(always)]
+    pub fn report_second_swap_call(self, start: Stamp) {
+        eprintln!(
+            "glyphflick timing second_swap_call_us={}",
+            start.elapsed().as_micros()
+        );
+    }
+
+    #[cfg(feature = "timing")]
+    #[inline(always)]
     pub fn mark_first_swap(self) {
         eprintln!(
             "glyphflick timing startup_to_first_swap_complete_us={}",
+            self.process_start.elapsed().as_micros()
+        );
+    }
+
+    #[cfg(feature = "timing")]
+    #[inline(always)]
+    pub fn mark_second_swap(self) {
+        eprintln!(
+            "glyphflick timing startup_to_second_swap_complete_us={}",
             self.process_start.elapsed().as_micros()
         );
     }
