@@ -220,7 +220,7 @@ Still needed:
 - [x] whether zero swap interval was actually accepted;
 - [ ] compositor-observed first-visible-frame methodology;
 - [ ] visible dismissal measurement;
-- [x] release binary size reported by runtime-budget CI (6,457,568 bytes / 6.158 MiB at commit `b8ff9f1`);
+- [x] release binary size reported by runtime-budget CI: 6,180,672 bytes / 5.894 MiB on the selected color-font runtime (down from 6,457,568 bytes / 6.158 MiB);
 - [ ] peak memory;
 - [ ] cold vs warm launch series;
 - [ ] documented measurements from target machine (automated by `scripts/target-probe.sh`).
@@ -256,7 +256,7 @@ Measurement-dependent work remains intentionally open.
 
 ## Q013 — Real Wayland QA
 
-**Status: BLOCKED ON Q008A/Q011/Q012 / AUTOMATED BUILD GREEN**
+**Status: TARGET PROBE READY / AUTOMATED BUILD GREEN**
 
 Host verification (automated where possible by `scripts/target-probe.sh`):
 
