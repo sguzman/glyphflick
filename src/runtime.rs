@@ -61,7 +61,6 @@ impl ApplicationHandler for Runtime {
         let (gl_window, gl) = create_display(event_loop, self.timing);
         self.timing.report_runtime_init(runtime_start);
 
-
         let egui_start = self.timing.stamp();
         let egui_glow = egui_glow::EguiGlow::new(event_loop, Arc::new(gl), None, None, false);
         self.timing.report_egui_init(egui_start);
