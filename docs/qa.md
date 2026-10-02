@@ -129,3 +129,28 @@ Do not dump unrelated setup instructions into a QA request.
 ## Regression rule
 
 Any bug found in host QA that can be represented deterministically in code should gain an automated regression test before being considered fully repaired.
+
+
+## One-command target probe
+
+Run from the repository root:
+
+```bash
+bash scripts/target-probe.sh
+```
+
+This probe performs the host-dependent checks that cannot be established in GitHub CI:
+
+1. builds the release binary with the compile-time `timing` feature;
+2. performs repeated real Wayland launches that exit immediately after the first successful EGL buffer swap;
+3. reports first-run and repeated-series timing for EGL/GL setup, egui initialization, font mapping, corpus initialization, first UI pass, and first swap;
+4. verifies the target host's actual Noto Color Emoji coverage and representative sequence rasterization;
+5. invokes Glyphflick's real `WlCopyClipboard` backend, lets the Rust test process exit, verifies the selection with `wl-paste`, and restores the previous text clipboard when possible.
+
+The auto-exit switch exists only when the `timing` Cargo feature is compiled. Normal release builds contain no environment check or benchmark auto-exit path.
+
+The first measured launch is reported separately but must not be called a controlled cold-cache measurement. The script does not flush kernel filesystem caches or require elevated privileges.
+
+The generated concise report is:
+
+`target/glyphflick-target-probe.txt`
