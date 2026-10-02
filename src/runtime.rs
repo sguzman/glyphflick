@@ -97,16 +97,35 @@ impl ApplicationHandler for Runtime {
             let egui_glow = self.egui_glow.as_mut().expect("egui runtime missing");
             let app = self.app.as_mut().expect("glyphflick app missing");
 
+            #[cfg(feature = "timing")]
+            let first_egui_start = self.first_swap_pending.then(|| self.timing.stamp());
+
             egui_glow.run(gl_window.window(), |ui| app.ui(ui));
+
+            #[cfg(feature = "timing")]
+            if let Some(start) = first_egui_start {
+                self.timing.report_first_egui_run(start);
+            }
 
             if app.exit_requested() {
                 event_loop.exit();
                 return;
             }
 
+            #[cfg(feature = "timing")]
+            let first_paint_start = self.first_swap_pending.then(|| self.timing.stamp());
+
             let screen_size: [u32; 2] = gl_window.window().inner_size().into();
             egui_glow.painter.clear(screen_size, CLEAR_COLOR);
             egui_glow.paint(gl_window.window());
+
+            #[cfg(feature = "timing")]
+            if let Some(start) = first_paint_start {
+                self.timing.report_first_gl_paint(start);
+            }
+
+            #[cfg(feature = "timing")]
+            let first_swap_start = self.first_swap_pending.then(|| self.timing.stamp());
 
             if let Err(error) = gl_window.swap_buffers() {
                 eprintln!("glyphflick: buffer swap failed: {error}");
@@ -116,6 +135,9 @@ impl ApplicationHandler for Runtime {
 
             #[cfg(feature = "timing")]
             if self.first_swap_pending {
+                if let Some(start) = first_swap_start {
+                    self.timing.report_first_swap_call(start);
+                }
                 self.first_swap_pending = false;
                 self.timing.mark_first_swap();
                 if self.timing.exit_after_first_swap() {
