@@ -53,3 +53,20 @@ impl fmt::Display for ClipboardError {
 }
 
 impl std::error::Error for ClipboardError {}
+
+
+#[cfg(test)]
+mod tests {
+    use super::{ClipboardBackend, WlCopyClipboard};
+
+    pub const WAYLAND_QA_TEXT: &str = "glyphflick-wayland-clipboard-qa";
+
+    #[test]
+    #[ignore = "requires a live Wayland session and wl-copy"]
+    fn real_wayland_clipboard_establishes_selection() {
+        let mut clipboard = WlCopyClipboard;
+        clipboard
+            .copy(WAYLAND_QA_TEXT)
+            .expect("wl-copy backend failed on live Wayland session");
+    }
+}
