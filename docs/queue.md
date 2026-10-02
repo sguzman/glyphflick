@@ -25,7 +25,7 @@ The native Rust/egui binary uses a project-owned Wayland/EGL runtime rather than
 Acceptance:
 
 - [x] repository compiles in Linux CI with Wayland/EGL dependencies;
-- [ ] release build executes on target Wayland environment;
+- [x] release build executes on target Wayland environment;
 - [x] one binary named `glyphflick`;
 - [x] window path requires no network/configuration setup;
 - [x] app/corpus/search/clipboard/performance/runtime boundaries exist;
@@ -55,7 +55,7 @@ Acceptance:
 
 ## Q004 — Clipboard backend spike
 
-**Status: CODE COMPLETE / WAYLAND QA PENDING**
+**Status: DONE**
 
 Current implementation uses `wl-copy` behind a project-owned `ClipboardBackend` trait.
 
@@ -63,7 +63,7 @@ Acceptance:
 
 - [x] exact text sequence is passed unchanged;
 - [x] backend reports process launch/non-zero-exit failure;
-- [ ] real Wayland clipboard persistence verified after UI exit;
+- [x] real Wayland clipboard persistence verified after UI exit;
 - [x] clipboard lifetime architecture recorded in ADR 0002.
 
 The helper is intentionally invoked only at commit time, so it contributes zero launch-path subprocess cost.
@@ -151,7 +151,7 @@ Acceptance:
 
 ## Q008A — Emoji font coverage and startup-cost spike
 
-**Status: STRATEGY SELECTED / TARGET LATENCY QA PENDING**
+**Status: DONE**
 
 Current egui bundled fonts intentionally cover only a subset of the complete modern emoji corpus. Glyphflick must not silently present missing-glyph boxes, but it also must not solve coverage by adding expensive font discovery/parsing to every invocation without measurement.
 
@@ -175,17 +175,24 @@ Automated evidence:
 
 Still evaluate:
 
-- target-host font initialization and first-visible-frame cost;
-- exact target-host Unicode 17 rendering;
-- target-host launch/first-frame measurements remain; when Noto Color Emoji is absent, the UI now reports rendering unavailability explicitly instead of silently showing tofu.
+Target-host results:
+
+- Noto Color Emoji mapped from `/usr/share/fonts/noto/NotoColorEmoji.ttf`;
+- visible scalar coverage: 1,438 / 1,438;
+- scalar-sufficient corpus entries: 3,944 / 3,944;
+- representative sequence rasterization passed;
+- font initialization median: 19 µs;
+- first UI median: 38.362 ms;
+- first successful swap median: 53.369 ms;
+- missing-font fallback remains explicit rather than silently showing tofu.
 
 Acceptance:
 
 - [x] representative Unicode 17 coverage quantified in CI;
-- [ ] startup/font initialization cost measured for viable approaches;
+- [x] startup/font initialization cost measured on target host;
 - [x] selected strategy performs no font enumeration/discovery scan;
 - [x] rendering strategy documented in ADR 0005;
-- [ ] host rendering verified.
+- [x] host rendering verified.
 
 ## Q010 — Stable window identity
 
@@ -223,11 +230,11 @@ Still needed:
 - [x] release binary size reported by runtime-budget CI: 6,180,672 bytes / 5.894 MiB on the selected color-font runtime (down from 6,457,568 bytes / 6.158 MiB);
 - [ ] peak memory;
 - [ ] cold vs warm launch series;
-- [ ] documented measurements from target machine (automated by `scripts/target-probe.sh`).
+- [x] documented measurements from target machine (automated by `scripts/target-probe.sh`).
 
 ## Q012 — Startup optimization pass
 
-**Status: IN PROGRESS / AUTOMATED BASELINE GREEN**
+**Status: IN PROGRESS / TARGET BASELINE CAPTURED**
 
 Already applied before measurement because they remove obviously unused machinery:
 
