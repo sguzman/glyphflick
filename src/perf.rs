@@ -39,6 +39,39 @@ impl Timing {
     }
 
     #[inline(always)]
+    pub fn report_runtime_init(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing wayland_egl_gl_init_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_egui_init(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing egui_runtime_init_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_swap_interval(self, disabled: bool) {
+        #[cfg(feature = "timing")]
+        eprintln!("glyphflick timing swap_interval_dont_wait={disabled}");
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, disabled);
+    }
+
+    #[inline(always)]
     pub fn report_corpus(self, start: Stamp, glyph_count: usize) {
         #[cfg(feature = "timing")]
         eprintln!(
@@ -55,6 +88,18 @@ impl Timing {
         #[cfg(feature = "timing")]
         eprintln!(
             "glyphflick timing startup_to_first_ui_us={}",
+            self.process_start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = self;
+    }
+
+    #[inline(always)]
+    pub fn mark_first_swap(self) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing startup_to_first_swap_complete_us={}",
             self.process_start.elapsed().as_micros()
         );
 
