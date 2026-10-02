@@ -1,6 +1,7 @@
 mod app;
 mod clipboard;
 mod corpus;
+mod fonts;
 mod navigation;
 mod perf;
 mod runtime;
