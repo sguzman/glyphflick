@@ -268,3 +268,15 @@ Normal operation should:
 - execute no remote content;
 - store no telemetry;
 - require no elevated privileges.
+
+
+## Font rendering
+
+Glyphflick keeps UI text and emoji rendering separate.
+
+- UI text uses the bundled Ubuntu Light face.
+- Emoji cells use a named `Glyphflick Emoji` family.
+- On Linux, the runtime probes a short fixed list for `NotoColorEmoji.ttf`, checking the Arch/EndeavourOS path first.
+- The selected file is mapped read-only with `mmap`; there is no fontconfig enumeration or directory scan.
+- Color-font support comes from a pinned egui/epaint revision with the `color_fonts` renderer enabled.
+- Missing-host-font behavior remains an explicit QA/design item; core search/copy data is independent of rendering.
