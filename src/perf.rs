@@ -107,16 +107,13 @@ impl Timing {
         let _ = self;
     }
 
+    #[cfg(feature = "timing")]
     #[inline(always)]
     pub fn mark_first_swap(self) {
-        #[cfg(feature = "timing")]
         eprintln!(
             "glyphflick timing startup_to_first_swap_complete_us={}",
             self.process_start.elapsed().as_micros()
         );
-
-        #[cfg(not(feature = "timing"))]
-        let _ = self;
     }
 
     #[inline(always)]
