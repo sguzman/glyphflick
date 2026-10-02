@@ -1,9 +1,11 @@
+use std::ops::Range;
 use std::time::Instant;
 
 use eframe::egui;
 
 use crate::clipboard::ClipboardBackend;
 use crate::corpus::Corpus;
+use crate::navigation::Selection;
 use crate::perf::Timing;
 use crate::search::SearchResults;
 
@@ -15,10 +17,14 @@ pub struct GlyphflickApp<B> {
     clipboard: B,
     corpus: Corpus,
     results: SearchResults,
+    selection: Selection,
     query: String,
     error: Option<String>,
     focus_search: bool,
     first_ui: bool,
+    columns: usize,
+    visible_rows: Range<usize>,
+    scroll_row: Option<usize>,
     timing: Timing,
 }
 
@@ -35,10 +41,14 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
             clipboard,
             corpus,
             results,
+            selection: Selection::default(),
             query: String::new(),
             error: None,
             focus_search: true,
             first_ui: true,
+            columns: 1,
+            visible_rows: 0..0,
+            scroll_row: None,
             timing,
         }
     }
@@ -46,8 +56,59 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
     fn refresh_results(&mut self) {
         let start = Instant::now();
         self.results.update(&self.corpus, &self.query);
+        self.selection.reset();
+        self.scroll_row = Some(0);
         self.timing
             .report_search(start.elapsed(), self.results.len());
+    }
+
+    fn handle_navigation(&mut self, ctx: &egui::Context) {
+        let has_active_selection = self.selection.active().is_some();
+        let modifiers = egui::Modifiers::default();
+
+        let (up, down, left, right) = ctx.input_mut(|input| {
+            let up = input.consume_key(modifiers, egui::Key::ArrowUp);
+            let down = input.consume_key(modifiers, egui::Key::ArrowDown);
+
+            let (left, right) = if has_active_selection {
+                (
+                    input.consume_key(modifiers, egui::Key::ArrowLeft),
+                    input.consume_key(modifiers, egui::Key::ArrowRight),
+                )
+            } else {
+                (false, false)
+            };
+
+            (up, down, left, right)
+        });
+
+        let len = self.results.len();
+        let moved = if up {
+            self.selection.move_up(len, self.columns)
+        } else if down {
+            self.selection.move_down(len, self.columns)
+        } else if left {
+            self.selection.move_left(len)
+        } else if right {
+            self.selection.move_right(len)
+        } else {
+            false
+        };
+
+        if moved {
+            self.ensure_selection_visible();
+        }
+    }
+
+    fn ensure_selection_visible(&mut self) {
+        let Some(position) = self.selection.active() else {
+            return;
+        };
+
+        let row = position / self.columns.max(1);
+        if !self.visible_rows.contains(&row) {
+            self.scroll_row = Some(row);
+        }
     }
 
     fn commit(&mut self, ctx: &egui::Context, text: &'static str) {
@@ -77,6 +138,8 @@ impl<B: ClipboardBackend> eframe::App for GlyphflickApp<B> {
             return;
         }
 
+        self.handle_navigation(&ctx);
+
         let mut picked = None;
 
         egui::CentralPanel::default().show_inside(ui, |ui| {
@@ -105,38 +168,48 @@ impl<B: ClipboardBackend> eframe::App for GlyphflickApp<B> {
             let columns = ((ui.available_width() + spacing) / (CELL_SIZE + spacing))
                 .floor()
                 .max(1.0) as usize;
+            self.columns = columns;
+
             let row_height = CELL_SIZE + ui.spacing().item_spacing.y;
             let rows = self.results.len().div_ceil(columns);
+            let active = self.selection.active();
 
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show_rows(ui, row_height, rows, |ui, row_range| {
-                    for row in row_range {
-                        ui.horizontal(|ui| {
-                            for column in 0..columns {
-                                let position = row * columns + column;
-                                let Some(index) = self.results.get(position) else {
-                                    break;
-                                };
-                                let glyph = self.corpus.get(index);
+            let mut scroll = egui::ScrollArea::vertical().auto_shrink([false, false]);
+            if let Some(row) = self.scroll_row.take() {
+                scroll = scroll.vertical_scroll_offset(row as f32 * row_height);
+            }
 
-                                let response = ui
-                                    .add_sized(
-                                        [CELL_SIZE, CELL_SIZE],
-                                        egui::Button::new(
-                                            egui::RichText::new(glyph.text()).size(GLYPH_SIZE),
-                                        )
-                                        .frame(false),
-                                    )
-                                    .on_hover_text(glyph.name());
+            let mut visible_rows = self.visible_rows.clone();
+            scroll.show_rows(ui, row_height, rows, |ui, row_range| {
+                visible_rows = row_range.clone();
 
-                                if response.clicked() {
-                                    picked = Some(glyph.text());
-                                }
+                for row in row_range {
+                    ui.horizontal(|ui| {
+                        for column in 0..columns {
+                            let position = row * columns + column;
+                            let Some(index) = self.results.get(position) else {
+                                break;
+                            };
+                            let glyph = self.corpus.get(index);
+
+                            let response = ui
+                                .add_sized(
+                                    [CELL_SIZE, CELL_SIZE],
+                                    egui::Button::selectable(
+                                        active == Some(position),
+                                        egui::RichText::new(glyph.text()).size(GLYPH_SIZE),
+                                    ),
+                                )
+                                .on_hover_text(glyph.name());
+
+                            if response.clicked() {
+                                picked = Some(glyph.text());
                             }
-                        });
-                    }
-                });
+                        }
+                    });
+                }
+            });
+            self.visible_rows = visible_rows;
 
             if self.results.is_empty() {
                 ui.centered_and_justified(|ui| {
@@ -146,7 +219,11 @@ impl<B: ClipboardBackend> eframe::App for GlyphflickApp<B> {
         });
 
         if picked.is_none() && ctx.input(|input| input.key_pressed(egui::Key::Enter)) {
-            picked = self.results.get(0).map(|index| self.corpus.get(index).text());
+            let position = self.selection.active().unwrap_or(0);
+            picked = self
+                .results
+                .get(position)
+                .map(|index| self.corpus.get(index).text());
         }
 
         if let Some(text) = picked {
