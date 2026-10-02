@@ -5,16 +5,17 @@ const BUCKET_COUNT: usize = 7;
 pub struct SearchResults {
     ordered: Vec<usize>,
     buckets: [Vec<usize>; BUCKET_COUNT],
+    total_len: usize,
+    all: bool,
 }
 
 impl SearchResults {
     pub fn new(corpus: &Corpus) -> Self {
-        let mut ordered = Vec::with_capacity(corpus.len());
-        ordered.extend(0..corpus.len());
-
         Self {
-            ordered,
+            ordered: Vec::new(),
             buckets: std::array::from_fn(|_| Vec::new()),
+            total_len: corpus.len(),
+            all: true,
         }
     }
 
@@ -22,9 +23,11 @@ impl SearchResults {
         let query = query.trim();
         if query.is_empty() {
             self.ordered.clear();
-            self.ordered.extend(0..corpus.len());
+            self.all = true;
             return;
         }
+
+        self.all = false;
 
         for bucket in &mut self.buckets {
             bucket.clear();
@@ -44,17 +47,25 @@ impl SearchResults {
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.ordered.len()
+        if self.all {
+            self.total_len
+        } else {
+            self.ordered.len()
+        }
     }
 
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.ordered.is_empty()
+        self.len() == 0
     }
 
     #[inline]
     pub fn get(&self, position: usize) -> Option<usize> {
-        self.ordered.get(position).copied()
+        if self.all {
+            (position < self.total_len).then_some(position)
+        } else {
+            self.ordered.get(position).copied()
+        }
     }
 }
 
@@ -137,6 +148,31 @@ mod tests {
     }
 
     #[test]
+    fn empty_query_is_an_implicit_identity_view() {
+        let corpus = Corpus::emoji();
+        let results = SearchResults::new(&corpus);
+
+        assert_eq!(results.len(), corpus.len());
+        assert_eq!(results.get(0), Some(0));
+        assert_eq!(results.get(corpus.len() - 1), Some(corpus.len() - 1));
+        assert_eq!(results.get(corpus.len()), None);
+        assert!(results.ordered.is_empty());
+    }
+
+    #[test]
+    fn clearing_query_returns_to_identity_view_without_refilling_indices() {
+        let corpus = Corpus::emoji();
+        let mut results = SearchResults::new(&corpus);
+
+        results.update(&corpus, "rocket");
+        assert!(!results.ordered.is_empty());
+
+        results.update(&corpus, "");
+        assert_eq!(results.len(), corpus.len());
+        assert!(results.ordered.is_empty());
+    }
+
+    #[test]
     fn exact_shortcode_wins() {
         assert_eq!(first_text("rocket"), "🚀");
     }
@@ -156,6 +192,6 @@ mod tests {
         let corpus = Corpus::emoji();
         let mut results = SearchResults::new(&corpus);
         results.update(&corpus, "sunglasses");
-        assert!(results.len() > 0);
+        assert!(!results.is_empty());
     }
 }
