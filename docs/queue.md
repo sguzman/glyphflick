@@ -266,9 +266,15 @@ Already applied before measurement because they remove obviously unused machiner
 - [x] CI rejects X11, GLX, wgpu, and generic OS-clipboard dependencies if they re-enter the graph;
 - [x] dependency/size budget workflow isolated from ordinary source commits.
 
-Measurement-dependent work remains intentionally open.
+Measured target work now establishes that EGL display/config/window creation (~30–31 ms median) and the first egui UI pass (~12 ms median) dominate startup. Alpha-zero is promoted to production.
 
-The next target experiment is automated by `scripts/graphics-probe.sh`: it compares the current context path, forced GLES, and an opaque alpha-zero EGL config while reporting the full startup decomposition.
+The next target experiment is automated by `scripts/latency-probe.sh` and compares:
+
+- the production alpha-zero OpenGL frame;
+- a timing-only deferred-grid first frame, including time to the second fully populated swap;
+- a probe-only Wayland softbuffer flat presenter to determine whether removing EGL is architecturally worthwhile.
+
+The softbuffer dependency is optional and excluded from the normal production feature set.
 
 ## Q013 — Real Wayland QA
 
