@@ -34,6 +34,13 @@ pub enum EmojiFontStatus {
     Missing,
 }
 
+impl EmojiFontStatus {
+    #[inline]
+    pub const fn is_mapped(self) -> bool {
+        matches!(self, Self::Mapped(_))
+    }
+}
+
 pub fn install(ctx: &egui::Context) -> EmojiFontStatus {
     let (definitions, status) = definitions();
     ctx.set_fonts(definitions);
