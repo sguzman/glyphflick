@@ -186,14 +186,12 @@ impl GlutinWindowContext {
     fn new(event_loop: &ActiveEventLoop, timing: Timing) -> Self {
         let window_attributes = window_attributes();
 
-        let mut config_template = glutin::config::ConfigTemplateBuilder::new()
+        let config_template = glutin::config::ConfigTemplateBuilder::new()
             .prefer_hardware_accelerated(Some(true))
+            .with_alpha_size(0)
             .with_depth_size(0)
             .with_stencil_size(0)
             .with_transparency(false);
-        if timing.alpha_zero() {
-            config_template = config_template.with_alpha_size(0);
-        }
 
         let display_start = timing.stamp();
         let (mut window, gl_config) = glutin_winit::DisplayBuilder::new()
