@@ -70,8 +70,12 @@ The normal build compiles timing instrumentation out.
 
 A dedicated Cargo feature named `timing` enables microsecond probes for:
 
+- Wayland/EGL/OpenGL initialization;
+- egui runtime initialization;
+- whether zero swap interval was accepted;
 - corpus construction;
 - main-entry to first UI pass;
+- first successful EGL buffer swap;
 - search updates and result counts;
 - clipboard establishment.
 
@@ -86,8 +90,13 @@ The implementation currently avoids:
 - startup config/persistence reads;
 - async runtime initialization;
 - logging framework initialization;
+- eframe entirely;
 - wgpu initialization;
-- X11 backend support;
+- X11 and GLX backend support;
+- egui-winit OS clipboard initialization;
+- application-icon PNG loading;
+- continuous event-loop polling;
+- intentional vsync waiting;
 - fuzzy-search indexing;
 - pre-normalized owned copies of the corpus;
 - resident-service coordination.
@@ -140,7 +149,9 @@ A dependency can be convenient and still be wrong for a transient utility.
 
 Potential experiments after the first build is validated:
 
-- Glow startup baseline and renderer initialization breakdown;
+- Wayland/EGL/OpenGL startup breakdown;
+- first-swap proxy versus compositor-observed visibility;
+- OpenGL versus OpenGL ES context creation if context setup dominates;
 - enabled-feature minimization audit;
 - eager corpus construction versus alternate static indexing;
 - precomputed normalized search fields only if query time warrants them;
