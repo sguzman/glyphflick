@@ -64,8 +64,7 @@ impl ApplicationHandler for Runtime {
         gl_window.window().set_visible(true);
 
         let egui_start = self.timing.stamp();
-        let egui_glow =
-            egui_glow::EguiGlow::new(event_loop, Arc::new(gl), None, None, false);
+        let egui_glow = egui_glow::EguiGlow::new(event_loop, Arc::new(gl), None, None, false);
         self.timing.report_egui_init(egui_start);
 
         let app = GlyphflickApp::new(&egui_glow.egui_ctx, WlCopyClipboard, self.timing);
@@ -287,8 +286,8 @@ fn create_display(
     let gl_window = GlutinWindowContext::new(event_loop, timing);
     let gl = unsafe {
         egui_glow::glow::Context::from_loader_function(|symbol| {
-            let symbol =
-                CString::new(symbol).expect("OpenGL procedure name unexpectedly contained NUL");
+            let symbol = CString::new(symbol)
+                .expect("OpenGL procedure name unexpectedly contained NUL");
             gl_window.get_proc_address(&symbol)
         })
     };
