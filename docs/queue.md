@@ -177,7 +177,7 @@ Still evaluate:
 
 - target-host font initialization and first-visible-frame cost;
 - exact target-host Unicode 17 rendering;
-- fallback behavior when Noto Color Emoji is absent.
+- target-host launch/first-frame measurements remain; when Noto Color Emoji is absent, the UI now reports rendering unavailability explicitly instead of silently showing tofu.
 
 Acceptance:
 
