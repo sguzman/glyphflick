@@ -15,12 +15,13 @@ No tray application. No persistent main window. No browser UI. No Electron. No w
 
 ## Status
 
-**Phase 0 — formalized. Implementation has not started.**
+**Implementation active — first native vertical slice is in-tree; target-host build and Wayland QA are pending.**
 
-The repository defines the product, UX contract, architecture, corpus/search model, performance discipline, validation plan, design decisions, and implementation queue before code is allowed to accrete.
+The current code includes a full local emoji corpus, ranked search, virtualized result rendering, one-shot copy/dismiss behavior, and opt-in latency instrumentation. See [docs/queue.md](docs/queue.md) for the exact validation state rather than treating unrun code as finished.
 
 ## Product invariants
 
+- **Latency is the reason this project exists. Startup and selection latency outrank feature breadth.**
 - **Fast enough to feel like a system primitive.**
 - **One-shot by default.** Selection ends the interaction.
 - **Clipboard correctness beats fake instantness.** The UI may disappear immediately, but copied data must remain pasteable.
@@ -33,6 +34,24 @@ The repository defines the product, UX contract, architecture, corpus/search mod
 - **Glyphs, not only emoji.** Emoji are the first corpus; the product model leaves room for symbols, kaomoji, and user-defined entries.
 - **Configuration must never become mandatory ceremony.** Good defaults first.
 - **The application owns its behavior; compositor configuration is outside this repository.**
+
+## Latency posture
+
+The first implementation deliberately excludes machinery that is not needed for the critical path:
+
+- eframe default features are disabled;
+- only Wayland, Glow, and bundled fonts are enabled;
+- wgpu and X11 are omitted;
+- no async runtime;
+- no persistence/config read on launch;
+- no network;
+- no logging framework;
+- no fuzzy-search index;
+- no resident Glyphflick daemon.
+
+Search reuses allocations and uses fixed relevance buckets instead of sorting every query. The clipboard helper is not started until a glyph is committed, so it contributes nothing to launch latency.
+
+Optimization beyond these obvious removals is measurement-driven. Set `GLYPHFLICK_TIMING=1` when running a future validated build to enable the built-in timing probes without adding a profiling dependency.
 
 ## Scope
 
