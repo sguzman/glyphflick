@@ -213,6 +213,12 @@ Zero-dependency timing probes now exist behind the compile-time Cargo feature `t
 
 Currently instrumented:
 
+- [x] process-main start to event-loop creation and `resumed`;
+- [x] EGL display/config/window creation;
+- [x] GL/GLES context creation;
+- [x] EGL surface creation;
+- [x] make-current and GL loader setup;
+- [x] first egui run, first GL paint, and first swap call;
 - [x] process-main start to first UI pass;
 - [x] corpus initialization time and glyph count;
 - [x] search update time and result count;
@@ -260,6 +266,8 @@ Already applied before measurement because they remove obviously unused machiner
 - [x] dependency/size budget workflow isolated from ordinary source commits.
 
 Measurement-dependent work remains intentionally open.
+
+The next target experiment is automated by `scripts/graphics-probe.sh`: it compares the current context path, forced GLES, and an opaque alpha-zero EGL config while reporting the full startup decomposition.
 
 ## Q013 — Real Wayland QA
 
