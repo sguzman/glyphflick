@@ -50,8 +50,8 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
-      - name: Validate target probe shell
-        run: bash -n scripts/target-probe.sh
+      - name: Validate probe shells
+        run: bash -n scripts/*.sh
 
       - name: Check
         run: cargo check --locked
