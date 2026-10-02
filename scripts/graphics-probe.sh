@@ -90,6 +90,8 @@ run_mode() {
   fi
 
   for key in \
+    event_loop_init_us \
+    startup_to_resumed_us \
     egl_display_config_window_us \
     gl_context_create_us \
     egl_surface_create_us \
@@ -98,6 +100,9 @@ run_mode() {
     wayland_egl_gl_init_us \
     egui_runtime_init_us \
     startup_to_first_ui_us \
+    first_egui_run_us \
+    first_gl_paint_us \
+    first_swap_call_us \
     startup_to_first_swap_complete_us
   do
     summarize_metric "$log" "$label" "$key"
