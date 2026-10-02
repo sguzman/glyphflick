@@ -117,6 +117,87 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::print_stdout)]
+    fn pinned_outline_font_probe() {
+        let Ok(path) = std::env::var("GLYPHFLICK_FONT_PROBE") else {
+            println!("glyphflick font probe: skipped (GLYPHFLICK_FONT_PROBE unset)");
+            return;
+        };
+
+        let bytes = std::fs::read(&path).expect("failed to read pinned font probe");
+        let mut definitions = FontDefinitions::empty();
+        definitions.font_data.insert(
+            UBUNTU.to_owned(),
+            Arc::new(FontData::from_static(UBUNTU_LIGHT)),
+        );
+        definitions.font_data.insert(
+            "NotoEmoji-Probe".to_owned(),
+            Arc::new(FontData::from_owned(bytes).tweak(FontTweak {
+                scale: 0.81,
+                ..Default::default()
+            })),
+        );
+
+        let family = vec![UBUNTU.to_owned(), "NotoEmoji-Probe".to_owned()];
+        definitions
+            .families
+            .insert(FontFamily::Proportional, family.clone());
+        definitions.families.insert(FontFamily::Monospace, family);
+
+        let ctx = egui::Context::default();
+        ctx.set_fonts(definitions);
+
+        let corpus = Corpus::emoji();
+        let font_id = egui::FontId::proportional(27.0);
+        let mut scalars = BTreeSet::new();
+        for (_, glyph) in corpus.iter() {
+            scalars.extend(glyph.text().chars().filter(|&c| !is_sequence_control(c)));
+        }
+
+        let mut prime = ctx.run_ui(Default::default(), |_| {});
+        prime.textures_delta.clear();
+
+        let mut missing = Vec::new();
+        let scalar_sufficient_entries = ctx.fonts_mut(|fonts| {
+            for &scalar in &scalars {
+                if !fonts.has_glyph(&font_id, scalar) {
+                    missing.push(scalar);
+                }
+            }
+
+            corpus
+                .iter()
+                .filter(|(_, glyph)| {
+                    glyph
+                        .text()
+                        .chars()
+                        .filter(|&c| !is_sequence_control(c))
+                        .all(|c| fonts.has_glyph(&font_id, c))
+                })
+                .count()
+        });
+
+        println!(
+            "glyphflick pinned outline probe: visible_scalars={}/{} missing={} scalar_sufficient_entries={}/{}",
+            scalars.len() - missing.len(),
+            scalars.len(),
+            missing.len(),
+            scalar_sufficient_entries,
+            corpus.len()
+        );
+
+        if !missing.is_empty() {
+            let sample = missing
+                .iter()
+                .take(40)
+                .map(|c| format!("U+{:04X} {}", *c as u32, c))
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!("pinned outline probe missing sample: {sample}");
+        }
+    }
+
+    #[test]
     fn glyphflick_font_set_excludes_unused_hack_face() {
         let fonts = definitions();
 
