@@ -2,7 +2,7 @@ use core::num::NonZeroU32;
 use std::ffi::CString;
 use std::sync::Arc;
 
-use glutin::context::NotCurrentGlContext as _;
+use glutin::context::{GlContext as _, NotCurrentGlContext as _};
 use glutin::display::{GetGlDisplay as _, GlDisplay as _};
 use glutin::prelude::GlSurface as _;
 use winit::application::ApplicationHandler;
@@ -165,6 +165,7 @@ impl GlutinWindowContext {
             .with_stencil_size(0)
             .with_transparency(false);
 
+        let display_start = timing.stamp();
         let (mut window, gl_config) = glutin_winit::DisplayBuilder::new()
             .with_preference(glutin_winit::ApiPreference::PreferEgl)
             .with_window_attributes(Some(window_attributes.clone()))
@@ -174,6 +175,7 @@ impl GlutinWindowContext {
                     .expect("no EGL configuration available for Glyphflick")
             })
             .expect("failed to create EGL configuration");
+        timing.report_display_build(display_start);
 
         let gl_display = gl_config.display();
 
@@ -184,18 +186,31 @@ impl GlutinWindowContext {
                 .as_raw()
         });
 
-        let context_attributes =
-            glutin::context::ContextAttributesBuilder::new().build(raw_window_handle);
+        let context_attributes = if timing.force_gles() {
+            glutin::context::ContextAttributesBuilder::new()
+                .with_context_api(glutin::context::ContextApi::Gles(None))
+                .build(raw_window_handle)
+        } else {
+            glutin::context::ContextAttributesBuilder::new().build(raw_window_handle)
+        };
         let fallback_context_attributes = glutin::context::ContextAttributesBuilder::new()
             .with_context_api(glutin::context::ContextApi::Gles(None))
             .build(raw_window_handle);
 
+        let context_start = timing.stamp();
         let not_current_gl_context = unsafe {
-            gl_display
-                .create_context(&gl_config, &context_attributes)
-                .or_else(|_| gl_display.create_context(&gl_config, &fallback_context_attributes))
-                .expect("failed to create OpenGL or OpenGL ES context")
+            if timing.force_gles() {
+                gl_display
+                    .create_context(&gl_config, &context_attributes)
+                    .expect("failed to create forced OpenGL ES context")
+            } else {
+                gl_display
+                    .create_context(&gl_config, &context_attributes)
+                    .or_else(|_| gl_display.create_context(&gl_config, &fallback_context_attributes))
+                    .expect("failed to create OpenGL or OpenGL ES context")
+            }
         };
+        timing.report_context_create(context_start);
 
         let window = window.take().unwrap_or_else(|| {
             glutin_winit::finalize_window(event_loop, window_attributes, &gl_config)
@@ -217,15 +232,20 @@ impl GlutinWindowContext {
                     height,
                 );
 
+        let surface_start = timing.stamp();
         let gl_surface = unsafe {
             gl_display
                 .create_window_surface(&gl_config, &surface_attributes)
                 .expect("failed to create EGL window surface")
         };
+        timing.report_surface_create(surface_start);
 
+        let current_start = timing.stamp();
         let gl_context = not_current_gl_context
             .make_current(&gl_surface)
             .expect("failed to make OpenGL context current");
+        timing.report_make_current(current_start);
+        timing.report_context_api(gl_context.context_api());
 
         let swap_interval_disabled = gl_surface
             .set_swap_interval(&gl_context, glutin::surface::SwapInterval::DontWait)
@@ -285,6 +305,7 @@ fn create_display(
     timing: Timing,
 ) -> (GlutinWindowContext, egui_glow::glow::Context) {
     let gl_window = GlutinWindowContext::new(event_loop, timing);
+    let loader_start = timing.stamp();
     let gl = unsafe {
         egui_glow::glow::Context::from_loader_function(|symbol| {
             let symbol =
@@ -292,6 +313,7 @@ fn create_display(
             gl_window.get_proc_address(&symbol)
         })
     };
+    timing.report_gl_loader(loader_start);
 
     (gl_window, gl)
 }
