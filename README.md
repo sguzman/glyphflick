@@ -17,7 +17,7 @@ No tray application. No persistent main window. No browser UI. No Electron. No w
 
 **Phase 0 — formalized. Implementation has not started.**
 
-The repository currently defines the product, UX contract, architecture, design decisions, and implementation queue before code is allowed to accrete.
+The repository defines the product, UX contract, architecture, corpus/search model, performance discipline, validation plan, design decisions, and implementation queue before code is allowed to accrete.
 
 ## Product invariants
 
@@ -47,6 +47,9 @@ The repository does **not** own the user's Hyprland configuration, global keybin
 - [docs/product.md](docs/product.md) — product specification
 - [docs/ux.md](docs/ux.md) — interaction and visual behavior
 - [docs/architecture.md](docs/architecture.md) — technical architecture and component boundaries
+- [docs/corpus.md](docs/corpus.md) — glyph data and search model
+- [docs/performance.md](docs/performance.md) — latency metrics and optimization discipline
+- [docs/qa.md](docs/qa.md) — automated validation and host QA contract
 - [docs/roadmap.md](docs/roadmap.md) — phased delivery plan
 - [docs/queue.md](docs/queue.md) — canonical implementation queue
 - [docs/decisions/](docs/decisions/) — architectural decision records
