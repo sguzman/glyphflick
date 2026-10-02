@@ -205,6 +205,33 @@ impl Timing {
 
     #[cfg(feature = "timing")]
     #[inline(always)]
+    pub fn report_first_egui_run(self, start: Stamp) {
+        eprintln!(
+            "glyphflick timing first_egui_run_us={}",
+            start.elapsed().as_micros()
+        );
+    }
+
+    #[cfg(feature = "timing")]
+    #[inline(always)]
+    pub fn report_first_gl_paint(self, start: Stamp) {
+        eprintln!(
+            "glyphflick timing first_gl_paint_us={}",
+            start.elapsed().as_micros()
+        );
+    }
+
+    #[cfg(feature = "timing")]
+    #[inline(always)]
+    pub fn report_first_swap_call(self, start: Stamp) {
+        eprintln!(
+            "glyphflick timing first_swap_call_us={}",
+            start.elapsed().as_micros()
+        );
+    }
+
+    #[cfg(feature = "timing")]
+    #[inline(always)]
     pub fn mark_first_swap(self) {
         eprintln!(
             "glyphflick timing startup_to_first_swap_complete_us={}",
