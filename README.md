@@ -15,9 +15,9 @@ No tray application. No persistent main window. No browser UI. No Electron. No w
 
 ## Status
 
-**Implementation active — first native vertical slice is in-tree; target-host build and Wayland QA are pending.**
+**Implementation active — the first keyboard-complete native vertical slice is in-tree; target-host build and Wayland QA are pending.**
 
-The current code includes a full local emoji corpus, ranked search, virtualized result rendering, one-shot copy/dismiss behavior, and opt-in latency instrumentation. See [docs/queue.md](docs/queue.md) for the exact validation state rather than treating unrun code as finished.
+The current code includes a full local emoji corpus, deterministic ranked search, virtualized result rendering, spatial keyboard navigation, one-shot copy/dismiss behavior, and compile-time optional latency instrumentation. See [docs/queue.md](docs/queue.md) for the exact validation state rather than treating unrun code as finished.
 
 ## Product invariants
 
@@ -49,9 +49,11 @@ The first implementation deliberately excludes machinery that is not needed for 
 - no fuzzy-search index;
 - no resident Glyphflick daemon.
 
-Search reuses allocations and uses fixed relevance buckets instead of sorting every query. The clipboard helper is not started until a glyph is committed, so it contributes nothing to launch latency.
+Search reuses allocations and uses fixed relevance buckets instead of sorting every query. Keyboard navigation is an index-only state machine. The result grid is virtualized. The clipboard helper is not started until a glyph is committed, so it contributes nothing to launch latency.
 
-Optimization beyond these obvious removals is measurement-driven. Set `GLYPHFLICK_TIMING=1` when running a future validated build to enable the built-in timing probes without adding a profiling dependency.
+The normal release build contains no timing/profiling work at all. Instrumentation exists behind the Cargo feature `timing`, allowing a dedicated measurement build without making every normal invocation pay for clocks, environment checks, or a profiling framework.
+
+Optimization beyond the obvious removals is measurement-driven. The remaining large questions are native window/renderer startup, font initialization, corpus construction, and clipboard establishment.
 
 ## Scope
 
