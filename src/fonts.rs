@@ -189,8 +189,8 @@ mod tests {
 
         let emoji = &fonts.families[&FontFamily::Name(Arc::from(EMOJI_FAMILY))];
         match status {
-            EmojiFontStatus::Mapped(_) => assert_eq!(emoji, [SYSTEM_EMOJI]),
-            EmojiFontStatus::Missing => assert_eq!(emoji, [UBUNTU]),
+            EmojiFontStatus::Mapped(_) => assert_eq!(emoji.as_slice(), [SYSTEM_EMOJI]),
+            EmojiFontStatus::Missing => assert_eq!(emoji.as_slice(), [UBUNTU]),
         }
     }
 }
