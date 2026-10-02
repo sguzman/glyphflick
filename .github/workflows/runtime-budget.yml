@@ -6,6 +6,7 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "src/**"
       - ".github/workflows/runtime-budget.yml"
   workflow_dispatch:
 
