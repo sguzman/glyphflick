@@ -30,7 +30,7 @@ echo "git_commit=$(git rev-parse --short=12 HEAD)"
 echo "rustc=$(rustc --version)"
 echo
 
-echo "[1/4] building timing binary"
+echo "[1/3] building timing binary"
 cargo build --release --locked --features timing
 
 summarize_metric() {
@@ -63,7 +63,6 @@ summarize_metric() {
 run_mode() {
   local label="$1"
   local force_gles="$2"
-  local alpha_zero="$3"
   local log
   log="$(mktemp)"
 
@@ -72,14 +71,8 @@ run_mode() {
 
   for ((run = 1; run <= runs; run++)); do
     printf -- "--- run %d ---\n" "$run" >>"$log"
-    if [[ "$force_gles" == true && "$alpha_zero" == true ]]; then
-      GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 GLYPHFLICK_FORCE_GLES=1 GLYPHFLICK_ALPHA_ZERO=1 \
-        ./target/release/glyphflick 2>>"$log"
-    elif [[ "$force_gles" == true ]]; then
+    if [[ "$force_gles" == true ]]; then
       GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 GLYPHFLICK_FORCE_GLES=1 \
-        ./target/release/glyphflick 2>>"$log"
-    elif [[ "$alpha_zero" == true ]]; then
-      GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 GLYPHFLICK_ALPHA_ZERO=1 \
         ./target/release/glyphflick 2>>"$log"
     else
       GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 \
@@ -138,16 +131,12 @@ run_mode() {
   echo
 } >>"$report"
 
-echo "[2/4] default context"
-run_mode default false false
+echo "[2/3] production OpenGL context"
+run_mode default false
 
 echo
-echo "[3/4] forced GLES context"
-run_mode gles true false
-
-echo
-echo "[4/4] opaque alpha-zero config"
-run_mode alpha0 false true
+echo "[3/3] forced GLES context"
+run_mode gles true
 
 echo
 echo "probe_report=$report"
