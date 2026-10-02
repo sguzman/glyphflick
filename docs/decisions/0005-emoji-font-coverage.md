@@ -1,159 +1,113 @@
-# ADR 0005: Emoji font coverage must be solved against launch latency
+# ADR 0005: Map one color emoji font; do not enumerate system fonts
 
-- Status: In progress / shipped-font coverage measurement pending
+- Status: Accepted for target QA; target latency measurement pending
 - Date: 2026-10-02
 
 ## Context
 
-Glyphflick targets a Unicode 17 emoji corpus, but rendering coverage and launch latency pull in opposite directions.
+Glyphflick exposes a Unicode 17 emoji corpus. The picker must render modern emoji correctly without turning every transient invocation into a font-discovery job.
 
-The exact egui 0.36.2 release documents that its default bundled fonts support roughly 1,216 emoji. The bundled set is deterministic and avoids runtime host-font discovery, but it cannot represent the complete Unicode 17 corpus.
+The original egui 0.36.2 bundled monochrome path failed this requirement badly. Measured against Glyphflick's corpus, it exposed only 89 of 1,438 visible emoji scalars and only 93 of 3,944 corpus entries were scalar-sufficient.
 
-That creates two simultaneous requirements:
+A pinned modern Google Fonts outline probe was not a solution either: stable egui's outline path reported only 15 of 1,438 visible scalars. The issue was renderer capability, not merely font age.
 
-1. the picker must not silently advertise large numbers of missing-glyph boxes;
-2. fixing coverage must not quietly add expensive per-launch font discovery, filesystem scans, decoding, or oversized assets.
+General system-font enumeration was also rejected. The newer egui system-font provider documents that enumeration can take hundreds of milliseconds and may block fallback lookup until enumeration completes. That is incompatible with Glyphflick's process-per-invocation latency posture unless measurements prove otherwise.
 
-This is a process-per-invocation utility. Font work is therefore part of the startup critical path.
+## Decision
 
-## Verified current baseline
+Glyphflick uses a narrow Linux color-font path:
 
-Glyphflick no longer enables the generic `egui/default_fonts` feature. It installs an explicit deterministic font definition containing only:
+1. keep Ubuntu Light as the UI font;
+2. locate Noto Color Emoji through a short, fixed path list rather than font enumeration;
+3. check the Arch/EndeavourOS package path first:
+   `/usr/share/fonts/noto/NotoColorEmoji.ttf`;
+4. memory-map the font read-only rather than copying the file into a heap buffer;
+5. register it as a dedicated `Glyphflick Emoji` family;
+6. render picker cells explicitly through that family;
+7. enable only egui/epaint's color-font rendering machinery needed for bitmap/COLR glyphs;
+8. pin the required post-0.36.2 egui revision exactly.
 
-- Ubuntu Light for UI text;
-- Noto Emoji;
-- emoji-icon-font.
+The application does not invoke fontconfig, scan font directories, spawn a font helper, start a background font-enumeration thread, or load arbitrary system fallback fonts.
 
-The unused Hack code face has been removed.
+## Why a dedicated emoji family
 
-No eframe/system-font provider is installed by Glyphflick's direct runtime. The current baseline is therefore:
+Noto Color Emoji also maps characters that can appear in ordinary text. Putting it in the UI fallback chain risks the emoji font stealing digits, symbols, or presentation choices in the search field.
 
-- deterministic;
-- offline;
-- no runtime system-font search;
-- no unused Hack face;
-- still potentially incomplete relative to the Unicode 17 corpus.
+The UI family therefore remains isolated to Ubuntu Light. Emoji cells opt into `Glyphflick Emoji` explicitly.
 
-The exact shipped-font scalar coverage is now measured from the font bytes through egui's own `has_glyph` API in CI instead of being inferred from package descriptions.
+## Automated evidence
 
-## Candidate strategies
+On the Ubuntu GitHub runner with `fonts-noto-color-emoji` installed:
 
-### A. Current deterministic egui bundle
+- 1,431 / 1,438 visible corpus scalars are available;
+- 3,877 / 3,944 corpus entries are scalar-sufficient;
+- representative basic emoji, skin-tone, flag, and ZWJ-family sequences rasterize to non-empty geometry.
 
-Advantages:
+The seven missing CI scalars are:
 
-- no runtime discovery;
-- simple baseline;
-- known egui compatibility.
+- U+1F6D8 LANDSLIDE;
+- U+1FA8A TROMBONE;
+- U+1FA8E TREASURE CHEST;
+- U+1FAC8 HAIRY CREATURE;
+- U+1FACD ORCA;
+- U+1FAEA DISTORTED FACE;
+- U+1FAEF FIGHT CLOUD.
 
-Disadvantage:
+Those are the seven standalone emoji characters newly added in Unicode Emoji 17.0. The target Arch package is Noto Color Emoji 2.051, the Unicode 17 release, and installs at Glyphflick's first lookup path.
 
-- incomplete modern emoji coverage;
-- includes at least one font Glyphflick likely does not need.
+## Binary-size result
 
-### B. Slimmed deterministic egui font subset — implemented baseline
+The previous stripped release baseline was:
 
-Advantages:
+- 6,457,568 bytes;
+- 6.158 MiB.
 
-- preserves offline deterministic startup;
-- removes the unused Hack face;
-- no new font asset source.
+The selected color-font implementation is:
 
-Disadvantage:
+- 6,180,192 bytes;
+- 5.894 MiB.
 
-- same fundamental emoji coverage ceiling unless the source font changes.
+The new implementation is 277,376 bytes smaller, approximately 4.3%, while providing color-font support.
 
-This is now the active baseline rather than a future experiment.
+Binary size is not treated as proof of lower launch latency. Target first-frame measurements remain required.
 
-### C. Explicitly bundled newer monochrome emoji dependency
+## Rejected alternatives
 
-Advantages:
+### Keep egui's bundled monochrome emoji faces
 
-- potentially much broader modern emoji coverage;
-- deterministic;
-- no filesystem discovery.
+Rejected because measured coverage is far too small for the Unicode 17 corpus.
 
-Costs to establish before adoption:
+### Replace only the monochrome font file
 
-- actual Unicode version/coverage;
-- binary size;
-- parse/registration time;
-- first visible-frame cost;
-- licensing/distribution implications.
+Rejected after the modern Noto outline probe demonstrated that the stable renderer path, not only font age, was the limiting factor.
 
-Do not add raw font files to this repository merely for convenience.
+### General system-font provider
 
-### D. System font discovery/loading
+Rejected for the launch path because it enumerates host fonts and introduces background/blocking discovery machinery that Glyphflick does not need.
 
-Advantages:
+### Pre-rasterized full emoji atlas
 
-- may use the host's current emoji fonts.
+Deferred. Existing egui experiments use multi-megabyte atlas assets and eagerly decode them. A Glyphflick-specific atlas would also need full UTF-8 sequence keys for flags, skin tones, and ZWJ sequences rather than single-codepoint registration. It remains an option only if target measurements show the mmap color-font path is too slow.
 
-Risks:
+### Bundle a ~10 MiB color font
 
-- per-launch filesystem/fontconfig work;
-- host-dependent results;
-- reproducibility problems;
-- color-font decoding may add more runtime machinery.
+Not selected. Mapping the distro-provided font avoids inflating the binary and avoids copying the entire file into process memory on startup.
 
-This is not the preferred path for a latency-first process-per-invocation utility.
+## Remaining work
 
-### E. Restrict corpus to verified-renderable bundled glyphs
+Before Q008A is fully done:
 
-Advantages:
-
-- minimal runtime complexity;
-- no missing-glyph entries.
-
-Disadvantage:
-
-- intentionally sacrifices corpus completeness.
-
-Treat as a fallback if broader rendering imposes unacceptable launch cost.
-
-### F. Image/texture emoji atlas
-
-Not preferred for MVP.
-
-It adds asset, texture, and rendering complexity and must demonstrate a compelling measured latency/correctness advantage before consideration.
-
-## Decision rule
-
-Choose the approach that gives the best useful emoji coverage at the lowest measured first-visible-frame cost.
-
-Priority order for this decision:
-
-1. visible entries must actually render;
-2. no runtime host-font scan unless measurements prove it competitive;
-3. minimize first-frame font initialization;
-4. minimize binary/asset size where it does not conflict with launch speed;
-5. expand coverage toward Unicode 17.
-
-Do not optimize binary size at the expense of launch latency merely because size is easier to measure.
-
-## Measurement plan
-
-Once the build is validated:
-
-1. quantify the active three-face bundle's scalar coverage in CI;
-2. record first-swap/font-initialization timing on the target host;
-3. compare only against a newer deterministic emoji source if coverage remains unacceptable;
-4. retain the smaller solution unless broader coverage justifies its measured launch cost.
-
-Representative coverage must include:
-
-- basic emoji;
-- variation-selector sequences;
-- skin tones;
-- flags;
-- ZWJ sequences;
-- recently added Unicode emoji.
+- measure font initialization and first visible frame on the target host;
+- verify the target Arch Unicode 17 font renders the newest corpus entries;
+- decide the user-visible behavior when Noto Color Emoji is not installed.
 
 ## Consequences
 
-Until this spike is resolved:
+The selected design intentionally accepts a Linux package dependency for full color emoji rendering in exchange for:
 
-- corpus completeness and rendered coverage are intentionally distinct;
-- Q013 host QA remains blocked;
-- system-font discovery is explicitly not part of the baseline;
-- font optimization is treated as performance engineering, not visual polish.
+- no font discovery scan;
+- no background enumeration;
+- no bundled multi-megabyte color font;
+- modern sequence rendering;
+- a smaller executable;
+- a narrow, measurable startup path.
