@@ -1,7 +1,5 @@
 use std::ops::Range;
 
-use eframe::egui;
-
 use crate::clipboard::ClipboardBackend;
 use crate::corpus::Corpus;
 use crate::navigation::Selection;
@@ -21,6 +19,7 @@ pub struct GlyphflickApp<B> {
     error: Option<String>,
     focus_search: bool,
     first_ui: bool,
+    exit_requested: bool,
     columns: usize,
     visible_rows: Range<usize>,
     scroll_row: Option<usize>,
@@ -28,8 +27,8 @@ pub struct GlyphflickApp<B> {
 }
 
 impl<B: ClipboardBackend> GlyphflickApp<B> {
-    pub fn new(cc: &eframe::CreationContext<'_>, clipboard: B, timing: Timing) -> Self {
-        cc.egui_ctx.set_visuals(egui::Visuals::dark());
+    pub fn new(ctx: &egui::Context, clipboard: B, timing: Timing) -> Self {
+        ctx.set_visuals(egui::Visuals::dark());
 
         let corpus_start = timing.stamp();
         let corpus = Corpus::emoji();
@@ -45,11 +44,17 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
             error: None,
             focus_search: true,
             first_ui: true,
+            exit_requested: false,
             columns: 1,
             visible_rows: 0..0,
             scroll_row: None,
             timing,
         }
+    }
+
+    #[inline]
+    pub const fn exit_requested(&self) -> bool {
+        self.exit_requested
     }
 
     fn refresh_results(&mut self) {
@@ -109,34 +114,31 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
         }
     }
 
-    fn commit(&mut self, ctx: &egui::Context, text: &'static str) {
+    fn commit(&mut self, text: &'static str) {
         let start = self.timing.stamp();
         match self.clipboard.copy(text) {
             Ok(()) => {
                 self.timing.report_clipboard(start);
-                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                self.exit_requested = true;
             }
             Err(error) => {
                 self.error = Some(error.to_string());
             }
         }
     }
-}
 
-impl<B: ClipboardBackend> eframe::App for GlyphflickApp<B> {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    pub fn ui(&mut self, ui: &mut egui::Ui) {
         if self.first_ui {
             self.first_ui = false;
             self.timing.mark_first_ui();
         }
 
-        let ctx = ui.ctx().clone();
-        if ctx.input(|input| input.key_pressed(egui::Key::Escape)) {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        if ui.input(|input| input.key_pressed(egui::Key::Escape)) {
+            self.exit_requested = true;
             return;
         }
 
-        self.handle_navigation(&ctx);
+        self.handle_navigation(ui.ctx());
 
         let mut picked = None;
 
@@ -216,7 +218,7 @@ impl<B: ClipboardBackend> eframe::App for GlyphflickApp<B> {
             }
         });
 
-        if picked.is_none() && ctx.input(|input| input.key_pressed(egui::Key::Enter)) {
+        if picked.is_none() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
             let position = self.selection.active().unwrap_or(0);
             picked = self
                 .results
@@ -225,7 +227,7 @@ impl<B: ClipboardBackend> eframe::App for GlyphflickApp<B> {
         }
 
         if let Some(text) = picked {
-            self.commit(&ctx, text);
+            self.commit(text);
         }
     }
 }
