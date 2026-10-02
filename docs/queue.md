@@ -151,15 +151,22 @@ Acceptance:
 
 ## Q008A — Emoji font coverage and startup-cost spike
 
-**Status: BLOCKING DESIGN / MEASUREMENT PENDING**
+**Status: IN PROGRESS / COVERAGE MEASUREMENT RUNNING**
 
 Current egui bundled fonts intentionally cover only a subset of the complete modern emoji corpus. Glyphflick must not silently present missing-glyph boxes, but it also must not solve coverage by adding expensive font discovery/parsing to every invocation without measurement.
 
-Evaluate:
+Current implementation:
 
-- bundled egui defaults as latency baseline;
-- one explicitly bundled modern emoji font;
-- system-font discovery/loading only if its startup cost is competitive;
+- uses an explicit deterministic three-face bundle: Ubuntu Light, Noto Emoji, and emoji-icon-font;
+- removes the unused Hack face from the startup font set;
+- performs no runtime system-font discovery;
+- now has an automated shipped-font scalar coverage diagnostic in CI.
+
+Still evaluate:
+
+- exact shipped-font coverage against the Unicode 17 corpus;
+- startup/font initialization cost on the target host;
+- a newer deterministic emoji font only if measured coverage is materially incomplete;
 - corpus filtering only as a fallback, because silently shrinking the useful corpus is undesirable.
 
 Acceptance:
@@ -203,7 +210,7 @@ Still needed:
 - [x] whether zero swap interval was actually accepted;
 - [ ] compositor-observed first-visible-frame methodology;
 - [ ] visible dismissal measurement;
-- [ ] binary size;
+- [x] release binary size reported by runtime-budget CI (6,457,568 bytes / 6.158 MiB at commit `b8ff9f1`);
 - [ ] peak memory;
 - [ ] cold vs warm launch series;
 - [ ] documented measurements from target machine.
