@@ -168,6 +168,15 @@ mod tests {
             corpus.len()
         );
 
+        if !missing.is_empty() {
+            let missing = missing
+                .iter()
+                .map(|c| format!("U+{:04X} {}", *c as u32, c))
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!("glyphflick system emoji missing scalars: {missing}");
+        }
+
         for sequence in ["🚀", "👍🏽", "🇲🇽", "👨‍👩‍👧‍👦"] {
             let galley = ctx.fonts_mut(|fonts| {
                 fonts.layout_no_wrap(sequence.to_owned(), font_id.clone(), egui::Color32::WHITE)
