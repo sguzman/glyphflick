@@ -30,7 +30,9 @@ pub struct GlyphflickApp<B> {
 
 impl<B: ClipboardBackend> GlyphflickApp<B> {
     pub fn new(ctx: &egui::Context, clipboard: B, timing: Timing) -> Self {
-        fonts::install(ctx);
+        let font_start = timing.stamp();
+        let emoji_font_status = fonts::install(ctx);
+        timing.report_font_init(font_start, emoji_font_status.is_mapped());
         let emoji_font = fonts::emoji_font_id(GLYPH_SIZE);
         ctx.set_visuals(egui::Visuals::dark());
         ctx.all_styles_mut(|style| {
