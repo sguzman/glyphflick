@@ -18,162 +18,191 @@ Items are ordered unless a dependency or newly discovered defect requires reprio
 
 ## Q001 — Bootstrap Rust application
 
-**Status: READY**
+**Status: CODE COMPLETE / QA PENDING**
 
-Create the minimum Rust project required to open a native egui surface.
+The native Rust/egui binary skeleton now exists with deliberately trimmed eframe features.
 
 Acceptance:
 
-- repository builds on target Linux environment;
-- one binary named `glyphflick`;
-- window launches without network/filesystem setup;
-- code structure already respects app/corpus/search/clipboard boundaries even if modules are tiny.
+- [ ] repository builds on target Linux environment;
+- [x] one binary named `glyphflick`;
+- [x] window path requires no network/configuration setup;
+- [x] app/corpus/search/clipboard/performance boundaries exist.
+
+Validation note: repository-side execution is not currently available through the project tooling, so target-host build validation remains pending.
 
 ## Q002 — Sample corpus vertical slice
 
-**Depends on:** Q001
+**Status: SUPERSEDED BY Q006**
 
-Add a deliberately tiny built-in sample corpus.
-
-Acceptance:
-
-- several emoji/glyphs render;
-- records use a project-owned `Glyph` model;
-- no dependency-specific emoji type leaks into the UI.
+The implementation skipped the temporary sample dataset and went directly to the real local emoji corpus while preserving the intended project-owned adapter boundary.
 
 ## Q003 — Basic search
 
-**Depends on:** Q002
+**Status: CODE COMPLETE / VALIDATION PENDING**
 
 Acceptance:
 
-- search field focused on launch;
-- typing filters sample records;
-- matching is case-insensitive;
-- search logic has unit tests;
-- UI does not own ranking logic.
+- [x] search field requests focus on launch;
+- [x] typing filters records;
+- [x] matching is ASCII case-insensitive for English names/shortcodes;
+- [x] search logic has unit tests in-tree;
+- [x] UI does not own ranking logic;
+- [ ] tests executed on target/build environment.
 
 ## Q004 — Clipboard backend spike
 
-**Depends on:** Q001
+**Status: CODE COMPLETE / WAYLAND QA PENDING**
 
-Resolve the concrete Wayland clipboard mechanism.
-
-Candidates may include an external `wl-copy` helper or a native Rust implementation.
+Current implementation uses `wl-copy` behind a project-owned `ClipboardBackend` trait.
 
 Acceptance:
 
-- exact Unicode sequence copies;
-- backend reports failure honestly;
-- content remains pasteable after visible UI process exits;
-- backend choice and rationale recorded in ADR if implementation changes the current decision.
+- [x] exact text sequence is passed unchanged;
+- [x] backend reports process launch/non-zero-exit failure;
+- [ ] real Wayland clipboard persistence verified after UI exit;
+- [x] clipboard lifetime architecture recorded in ADR 0002.
+
+The helper is intentionally invoked only at commit time, so it contributes zero launch-path subprocess cost.
 
 ## Q005 — Commit and dismiss path
 
-**Depends on:** Q002, Q004
+**Status: CODE COMPLETE / QA PENDING**
 
 Acceptance:
 
-- clicking a glyph invokes clipboard backend;
-- successful copy closes UI immediately;
-- failed copy leaves UI visible with compact error;
-- Escape exits without changing clipboard;
-- fake clipboard tests cover success/failure behavior.
+- [x] clicking a glyph invokes clipboard backend;
+- [x] Enter commits the first ranked result;
+- [x] successful backend return requests immediate viewport close;
+- [x] failed copy leaves UI visible with inline error;
+- [x] Escape requests close without clipboard work;
+- [x] fake clipboard tests cover exact Unicode and failure behavior;
+- [ ] host behavior validated.
 
 ## Q006 — Real emoji corpus adapter
 
-**Depends on:** Q003
+**Status: CODE COMPLETE / VALIDATION PENDING**
 
 Acceptance:
 
-- complete chosen emoji corpus available locally;
-- canonical name preserved;
-- aliases/shortcodes included when source supports them;
-- multi-codepoint sequences preserved exactly;
-- external crate types terminate at corpus boundary.
+- [x] Unicode 17 emoji corpus is local through `emojis` 0.9.0;
+- [x] canonical names exposed;
+- [x] all available shortcodes exposed;
+- [x] skin-tone variants included;
+- [x] multi-codepoint sequences remain opaque exact strings;
+- [x] third-party emoji type remains private to corpus adapter internals;
+- [ ] corpus tests executed.
+
+Implementation intentionally stores only static emoji references instead of allocating owned name/text copies at startup.
 
 ## Q007 — Search relevance v1
 
-**Depends on:** Q006
+**Status: CODE COMPLETE / VALIDATION PENDING**
 
-Implement deterministic ranking:
+Implemented deterministic bucket ranking without per-query sorting:
 
-1. exact alias/shortcode;
-2. prefix;
-3. word-prefix;
-4. substring.
+1. exact glyph text;
+2. exact shortcode;
+3. exact canonical name;
+4. canonical-name prefix;
+5. shortcode prefix;
+6. canonical-name word-prefix;
+7. name/shortcode substring.
 
 Acceptance:
 
-- tests cover representative ambiguous queries;
-- stable ordering;
-- no fuzzy search yet.
+- [x] deterministic ranking;
+- [x] tests cover exact shortcode, case, canonical name, substring;
+- [x] no fuzzy search;
+- [x] result vectors are allocation-reused;
+- [ ] tests executed.
 
 ## Q008 — Virtualized result grid
 
-**Depends on:** Q006
+**Status: CODE COMPLETE / QA PENDING**
 
 Acceptance:
 
-- full corpus scroll remains smooth;
-- only visible/near-visible rows are rendered when practical;
-- cell layout is stable;
-- hover exposes human-readable name.
+- [x] egui `ScrollArea::show_rows` virtualizes rows;
+- [x] cell geometry is fixed;
+- [x] hover exposes canonical name;
+- [ ] full-corpus scroll smoothness verified on target host.
 
 ## Q009 — Keyboard navigation
 
-**Depends on:** Q008
+**Status: IN PROGRESS**
 
-Acceptance:
+Already present:
 
-- arrows move active result spatially;
-- Enter commits;
-- selection scrolls into view;
-- typing/search remains natural;
-- Escape cancels.
+- [x] typing searches;
+- [x] Enter commits the first ranked result;
+- [x] Escape cancels.
+
+Remaining:
+
+- [ ] active result state;
+- [ ] spatial arrow navigation;
+- [ ] active-result visibility/scroll behavior;
+- [ ] keyboard/pointer selection-state coherence.
 
 ## Q010 — Stable window identity
 
-**Depends on:** Q001
+**Status: CODE COMPLETE / QA PENDING**
 
 Acceptance:
 
-- predictable app ID/title/class properties for external compositor rules;
-- no Hyprland-specific logic required in core app.
+- [x] Wayland app ID is `glyphflick`;
+- [x] title is `Glyphflick`;
+- [x] no Hyprland-specific logic exists in core app;
+- [ ] compositor-visible identity verified on host.
 
 ## Q011 — Performance instrumentation
 
-**Depends on:** Q005, Q006
+**Status: IN PROGRESS**
 
-Measure:
+Zero-dependency opt-in timing probes now exist behind `GLYPHFLICK_TIMING`.
 
-- startup to first useful frame;
-- corpus setup;
-- search update;
-- copy call;
-- visible dismissal;
-- memory;
-- binary size.
+Currently instrumented:
 
-Acceptance:
+- [x] process-main start to first UI pass;
+- [x] search update time and result count;
+- [x] clipboard establishment call.
 
-- measurements documented;
-- no optimization claimed without evidence.
+Still needed:
+
+- [ ] corpus initialization time;
+- [ ] first actually presented frame methodology;
+- [ ] visible dismissal measurement;
+- [ ] binary size;
+- [ ] peak memory;
+- [ ] cold vs warm launch series;
+- [ ] documented measurements from target machine.
 
 ## Q012 — Startup optimization pass
 
-**Depends on:** Q011
+**Status: IN PROGRESS EARLY**
 
-Acceptance:
+Already applied before measurement because they remove obviously unused machinery:
 
-- dependency/features reviewed;
-- renderer/backend choice measured;
-- unnecessary launch I/O removed;
-- release profile tuned only where measurements justify it.
+- [x] eframe default features disabled;
+- [x] Wayland enabled, X11 omitted;
+- [x] Glow renderer enabled, wgpu omitted;
+- [x] persistence omitted;
+- [x] links/web features omitted;
+- [x] no async runtime;
+- [x] no logging/profiling framework;
+- [x] no config parsing/filesystem I/O on launch;
+- [x] release `opt-level=3`;
+- [x] fat LTO;
+- [x] one codegen unit;
+- [x] panic abort;
+- [x] symbol stripping.
+
+Measurement-dependent work remains intentionally open.
 
 ## Q013 — Real Wayland QA
 
-**Depends on:** Q005, Q009, Q012
+**Status: BLOCKED ON Q009/Q011/Q012**
 
 Manual host verification:
 
