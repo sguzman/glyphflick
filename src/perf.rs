@@ -14,6 +14,8 @@ pub struct Timing {
     process_start: Instant,
     #[cfg(feature = "timing")]
     exit_after_first_swap: bool,
+    #[cfg(feature = "timing")]
+    force_gles: bool,
 }
 
 impl Default for Timing {
@@ -24,6 +26,8 @@ impl Default for Timing {
             process_start: Instant::now(),
             #[cfg(feature = "timing")]
             exit_after_first_swap: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_SWAP").is_some(),
+            #[cfg(feature = "timing")]
+            force_gles: std::env::var_os("GLYPHFLICK_FORCE_GLES").is_some(),
         }
     }
 }
@@ -115,6 +119,88 @@ impl Timing {
     #[inline(always)]
     pub const fn exit_after_first_swap(self) -> bool {
         self.exit_after_first_swap
+    }
+
+    #[inline(always)]
+    pub const fn force_gles(self) -> bool {
+        #[cfg(feature = "timing")]
+        {
+            self.force_gles
+        }
+
+        #[cfg(not(feature = "timing"))]
+        {
+            false
+        }
+    }
+
+    #[inline(always)]
+    pub fn report_display_build(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing egl_display_config_window_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_context_create(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing gl_context_create_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_surface_create(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing egl_surface_create_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_make_current(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing gl_make_current_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_gl_loader(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing glow_loader_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_context_api(self, api: glutin::context::ContextApi) {
+        #[cfg(feature = "timing")]
+        eprintln!("glyphflick timing context_api={api:?}");
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, api);
     }
 
     #[cfg(feature = "timing")]
