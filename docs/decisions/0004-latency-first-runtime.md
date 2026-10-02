@@ -55,11 +55,23 @@ Use a linear corpus scan with allocation-reused fixed relevance buckets.
 
 Do not build a fuzzy index or allocate normalized copies of every emoji name at startup without measurements showing that query evaluation is a meaningful bottleneck.
 
+### Keyboard navigation
+
+Use index arithmetic over the existing ranked-result vector.
+
+Do not create a separate widget model, focus tree, or navigation collection solely for keyboard movement.
+
 ### Clipboard
 
 Do not probe or start `wl-copy` at application launch.
 
 Invoke it only after commit so clipboard machinery contributes nothing to the launch path.
+
+### Instrumentation
+
+Production timing instrumentation is compiled out.
+
+The Cargo feature `timing` opts a benchmark build into microsecond probes. The normal build therefore performs no profiler environment lookup and no timing-clock reads in corpus/search/clipboard hot paths.
 
 ## Rationale
 
@@ -86,7 +98,8 @@ Positive:
 - narrower Linux runtime;
 - less renderer/dependency machinery;
 - no avoidable launch I/O;
-- instrumentation can measure the remaining cost cleanly.
+- normal release builds pay no instrumentation overhead;
+- benchmark builds can measure the remaining cost cleanly.
 
 Tradeoffs:
 
