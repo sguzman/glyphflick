@@ -117,6 +117,15 @@ For measurement-dependent changes:
 
 Cold and repeated/warm launches must be reported separately.
 
+## Current automated baseline
+
+At commit `b8ff9f1`, the dedicated Linux runtime-budget workflow produced a stripped release binary of:
+
+- 6,457,568 bytes;
+- 6.158 MiB.
+
+This is a CI-host measurement, not a target-machine latency measurement. The same workflow also rejects X11, GLX, wgpu, arboard, and smithay-clipboard if they re-enter the runtime dependency graph.
+
 ## Target character
 
 Until target hardware measurements exist, numerical thresholds are provisional.
