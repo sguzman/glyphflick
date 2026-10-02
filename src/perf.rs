@@ -16,8 +16,6 @@ pub struct Timing {
     exit_after_first_swap: bool,
     #[cfg(feature = "timing")]
     force_gles: bool,
-    #[cfg(feature = "timing")]
-    alpha_zero: bool,
 }
 
 impl Default for Timing {
@@ -30,8 +28,6 @@ impl Default for Timing {
             exit_after_first_swap: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_SWAP").is_some(),
             #[cfg(feature = "timing")]
             force_gles: std::env::var_os("GLYPHFLICK_FORCE_GLES").is_some(),
-            #[cfg(feature = "timing")]
-            alpha_zero: std::env::var_os("GLYPHFLICK_ALPHA_ZERO").is_some(),
         }
     }
 }
@@ -154,19 +150,6 @@ impl Timing {
         #[cfg(feature = "timing")]
         {
             self.force_gles
-        }
-
-        #[cfg(not(feature = "timing"))]
-        {
-            false
-        }
-    }
-
-    #[inline(always)]
-    pub const fn alpha_zero(self) -> bool {
-        #[cfg(feature = "timing")]
-        {
-            self.alpha_zero
         }
 
         #[cfg(not(feature = "timing"))]
