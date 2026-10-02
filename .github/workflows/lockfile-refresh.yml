@@ -5,10 +5,9 @@ on:
     branches: [main]
     paths:
       - "Cargo.toml"
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: glyphflick-lockfile-${{ github.ref }}
@@ -20,11 +19,20 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo generate-lockfile
-      - uses: actions/upload-artifact@v4
-        with:
-          name: glyphflick-cargo-lock
-          path: Cargo.lock
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit refreshed lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "build: refresh Cargo lockfile"
+          git push
