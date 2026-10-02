@@ -9,13 +9,17 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: glyphflick-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   rust:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install native build dependencies
         run: |
