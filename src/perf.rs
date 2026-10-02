@@ -47,6 +47,30 @@ impl Timing {
     }
 
     #[inline(always)]
+    pub fn report_event_loop_init(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing event_loop_init_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn mark_resumed(self) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing startup_to_resumed_us={}",
+            self.process_start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = self;
+    }
+
+    #[inline(always)]
     pub fn report_runtime_init(self, start: Stamp) {
         #[cfg(feature = "timing")]
         eprintln!(
