@@ -61,7 +61,7 @@ Search reuses allocations and fixed relevance buckets instead of sorting every q
 
 The normal release build contains no timing/profiling work. The Cargo feature `timing` compiles measurement probes into a dedicated benchmark build.
 
-The remaining large questions are EGL/context startup, font initialization/coverage, corpus construction, and clipboard establishment. Those are measurement targets, not excuses for adding more machinery.
+Emoji rendering now uses one directly memory-mapped Noto Color Emoji file through a dedicated font family; Glyphflick does not enumerate system fonts. Automated CI coverage is strong and the color-font build is smaller than the previous monochrome baseline. The remaining large questions are target first-frame/font initialization cost, EGL/context startup, corpus construction, and clipboard establishment. Those are measurement targets, not excuses for adding more machinery.
 
 ## Scope
 
