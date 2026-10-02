@@ -5,8 +5,6 @@ mod navigation;
 mod perf;
 mod search;
 
-use std::time::Instant;
-
 use app::GlyphflickApp;
 use clipboard::WlCopyClipboard;
 use eframe::egui;
@@ -16,8 +14,7 @@ const WINDOW_WIDTH: f32 = 560.0;
 const WINDOW_HEIGHT: f32 = 440.0;
 
 fn main() -> eframe::Result {
-    let process_start = Instant::now();
-    let timing = Timing::from_env(process_start);
+    let timing = Timing::new();
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
