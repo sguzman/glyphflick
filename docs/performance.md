@@ -124,10 +124,15 @@ The original slim monochrome-font baseline at commit `b8ff9f1` produced a stripp
 - 6,457,568 bytes;
 - 6.158 MiB.
 
-The selected color-font implementation at commit `d6a44ab` produced:
+The selected color-font implementation initially measured:
 
 - 6,180,672 bytes;
 - 5.894 MiB.
+
+After adding compile-time-only graphics instrumentation, the normal stripped release measured:
+
+- 6,181,024 bytes;
+- 5.895 MiB.
 
 That is 276,896 bytes smaller, about a 4.3% reduction, despite adding color-font rendering support. The timing/QA hooks remain compiled out of the normal release; the post-probe release measurement stayed at 5.894 MiB. The reduction comes from dropping the embedded monochrome emoji faces and mapping the host's Noto Color Emoji file instead.
 
