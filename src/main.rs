@@ -14,7 +14,7 @@ const WINDOW_WIDTH: f32 = 560.0;
 const WINDOW_HEIGHT: f32 = 440.0;
 
 fn main() -> eframe::Result {
-    let timing = Timing::new();
+    let timing = Timing::default();
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
