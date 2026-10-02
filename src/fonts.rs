@@ -1,50 +1,100 @@
+use std::fs::File;
 use std::sync::Arc;
 
-use egui::{FontData, FontDefinitions, FontFamily, FontTweak};
-use epaint_default_fonts::{EMOJI_ICON, NOTO_EMOJI_REGULAR, UBUNTU_LIGHT};
+use egui::{FontData, FontDefinitions, FontFamily};
+use epaint_default_fonts::UBUNTU_LIGHT;
+use memmap2::{Mmap, MmapOptions};
 
 const UBUNTU: &str = "Ubuntu-Light";
-const NOTO_EMOJI: &str = "NotoEmoji-Regular";
-const EMOJI_ICON_FONT: &str = "emoji-icon-font";
+const SYSTEM_EMOJI: &str = "NotoColorEmoji";
+const EMOJI_FAMILY: &str = "Glyphflick Emoji";
 
-pub fn install(ctx: &egui::Context) {
-    ctx.set_fonts(definitions());
+const SYSTEM_EMOJI_PATHS: &[&str] = &[
+    // Arch / EndeavourOS: extra/noto-fonts-emoji
+    "/usr/share/fonts/noto/NotoColorEmoji.ttf",
+    // Debian / Ubuntu:
+    "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+    // Common manually installed / alternate package layouts:
+    "/usr/share/fonts/TTF/NotoColorEmoji.ttf",
+    "/usr/local/share/fonts/NotoColorEmoji.ttf",
+];
+
+struct MappedFont(Mmap);
+
+impl AsRef<[u8]> for MappedFont {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
 }
 
-fn definitions() -> FontDefinitions {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EmojiFontStatus {
+    Mapped(&'static str),
+    Missing,
+}
+
+pub fn install(ctx: &egui::Context) -> EmojiFontStatus {
+    let (definitions, status) = definitions();
+    ctx.set_fonts(definitions);
+    status
+}
+
+#[inline]
+pub fn emoji_font_id(size: f32) -> egui::FontId {
+    egui::FontId::new(size, FontFamily::Name(Arc::from(EMOJI_FAMILY)))
+}
+
+fn definitions() -> (FontDefinitions, EmojiFontStatus) {
     let mut fonts = FontDefinitions::empty();
 
     fonts.font_data.insert(
         UBUNTU.to_owned(),
         Arc::new(FontData::from_static(UBUNTU_LIGHT)),
     );
-    fonts.font_data.insert(
-        NOTO_EMOJI.to_owned(),
-        Arc::new(FontData::from_static(NOTO_EMOJI_REGULAR).tweak(FontTweak {
-            scale: 0.81,
-            ..Default::default()
-        })),
-    );
-    fonts.font_data.insert(
-        EMOJI_ICON_FONT.to_owned(),
-        Arc::new(FontData::from_static(EMOJI_ICON).tweak(FontTweak {
-            scale: 0.90,
-            ..Default::default()
-        })),
-    );
 
-    let family = vec![
-        UBUNTU.to_owned(),
-        NOTO_EMOJI.to_owned(),
-        EMOJI_ICON_FONT.to_owned(),
-    ];
+    let status = if let Some((path, data)) = map_system_emoji_font() {
+        fonts.font_data.insert(SYSTEM_EMOJI.to_owned(), Arc::new(data));
+        EmojiFontStatus::Mapped(path)
+    } else {
+        EmojiFontStatus::Missing
+    };
 
+    let ui_family = vec![UBUNTU.to_owned()];
     fonts
         .families
-        .insert(FontFamily::Proportional, family.clone());
-    fonts.families.insert(FontFamily::Monospace, family);
+        .insert(FontFamily::Proportional, ui_family.clone());
+    fonts.families.insert(FontFamily::Monospace, ui_family);
 
+    let emoji_family = if status == EmojiFontStatus::Missing {
+        vec![UBUNTU.to_owned()]
+    } else {
+        vec![SYSTEM_EMOJI.to_owned()]
+    };
     fonts
+        .families
+        .insert(FontFamily::Name(Arc::from(EMOJI_FAMILY)), emoji_family);
+
+    (fonts, status)
+}
+
+fn map_system_emoji_font() -> Option<(&'static str, FontData)> {
+    for &path in SYSTEM_EMOJI_PATHS {
+        let Ok(file) = File::open(path) else {
+            continue;
+        };
+
+        // SAFETY: these are read-only system font files. We retain the immutable
+        // mapping for as long as egui can reference its bytes.
+        let Ok(mapping) = (unsafe { MmapOptions::new().map(&file) }) else {
+            continue;
+        };
+
+        let blob: epaint::text::Blob = Arc::new(MappedFont(mapping));
+        return Some((path, FontData::from_blob(blob, 0)));
+    }
+
+    None
 }
 
 #[cfg(test)]
@@ -61,94 +111,17 @@ mod tests {
 
     #[test]
     #[expect(clippy::print_stdout)]
-    fn bundled_font_scalar_coverage_report() {
+    fn system_color_font_coverage_report() {
         let ctx = egui::Context::default();
-        install(&ctx);
+        let status = install(&ctx);
 
-        let corpus = Corpus::emoji();
-        let font_id = egui::FontId::proportional(27.0);
-        let mut scalars = BTreeSet::new();
-
-        for (_, glyph) in corpus.iter() {
-            scalars.extend(glyph.text().chars().filter(|&c| !is_sequence_control(c)));
-        }
-
-        let mut prime = ctx.run_ui(Default::default(), |_| {});
-        prime.textures_delta.clear();
-
-        let mut missing = Vec::new();
-        let renderable_entries = ctx.fonts_mut(|fonts| {
-            for &scalar in &scalars {
-                if !fonts.has_glyph(&font_id, scalar) {
-                    missing.push(scalar);
-                }
-            }
-
-            corpus
-                .iter()
-                .filter(|(_, glyph)| {
-                    glyph
-                        .text()
-                        .chars()
-                        .filter(|&c| !is_sequence_control(c))
-                        .all(|c| fonts.has_glyph(&font_id, c))
-                })
-                .count()
-        });
-
-        let covered = scalars.len() - missing.len();
-        println!(
-            "glyphflick font coverage: visible_scalars={}/{} missing={} scalar_sufficient_entries={}/{}",
-            covered,
-            scalars.len(),
-            missing.len(),
-            renderable_entries,
-            corpus.len()
-        );
-
-        if !missing.is_empty() {
-            let missing = missing
-                .iter()
-                .map(|c| format!("U+{:04X} {}", *c as u32, c))
-                .collect::<Vec<_>>()
-                .join(", ");
-            println!("missing visible scalars: {missing}");
-        }
-    }
-
-    #[test]
-    #[expect(clippy::print_stdout)]
-    fn pinned_outline_font_probe() {
-        let Ok(path) = std::env::var("GLYPHFLICK_FONT_PROBE") else {
-            println!("glyphflick font probe: skipped (GLYPHFLICK_FONT_PROBE unset)");
+        let EmojiFontStatus::Mapped(path) = status else {
+            println!("glyphflick system emoji coverage: skipped (Noto Color Emoji not found)");
             return;
         };
 
-        let bytes = std::fs::read(&path).expect("failed to read pinned font probe");
-        let mut definitions = FontDefinitions::empty();
-        definitions.font_data.insert(
-            UBUNTU.to_owned(),
-            Arc::new(FontData::from_static(UBUNTU_LIGHT)),
-        );
-        definitions.font_data.insert(
-            "NotoEmoji-Probe".to_owned(),
-            Arc::new(FontData::from_owned(bytes).tweak(FontTweak {
-                scale: 0.81,
-                ..Default::default()
-            })),
-        );
-
-        let family = vec![UBUNTU.to_owned(), "NotoEmoji-Probe".to_owned()];
-        definitions
-            .families
-            .insert(FontFamily::Proportional, family.clone());
-        definitions.families.insert(FontFamily::Monospace, family);
-
-        let ctx = egui::Context::default();
-        ctx.set_fonts(definitions);
-
         let corpus = Corpus::emoji();
-        let font_id = egui::FontId::proportional(27.0);
+        let font_id = emoji_font_id(27.0);
         let mut scalars = BTreeSet::new();
         for (_, glyph) in corpus.iter() {
             scalars.extend(glyph.text().chars().filter(|&c| !is_sequence_control(c)));
@@ -178,7 +151,7 @@ mod tests {
         });
 
         println!(
-            "glyphflick pinned outline probe: visible_scalars={}/{} missing={} scalar_sufficient_entries={}/{}",
+            "glyphflick system emoji coverage: path={path} visible_scalars={}/{} missing={} scalar_sufficient_entries={}/{}",
             scalars.len() - missing.len(),
             scalars.len(),
             missing.len(),
@@ -186,45 +159,29 @@ mod tests {
             corpus.len()
         );
 
-        let galley = ctx.fonts_mut(|fonts| {
-            fonts.layout_no_wrap(
-                "🚀🤖🦀".to_owned(),
-                font_id.clone(),
-                egui::Color32::WHITE,
-            )
-        });
-        let rasterized = galley
-            .rows
-            .iter()
-            .flat_map(|row| row.glyphs.iter())
-            .filter(|glyph| !is_sequence_control(glyph.chr))
-            .all(|glyph| !glyph.uv_rect.is_nothing());
-        assert!(
-            rasterized,
-            "pinned outline font has charmap entries that egui 0.36.2 cannot rasterize"
-        );
-        println!("glyphflick pinned outline probe: representative_rasterization=ok");
-
-        if !missing.is_empty() {
-            let sample = missing
-                .iter()
-                .take(40)
-                .map(|c| format!("U+{:04X} {}", *c as u32, c))
-                .collect::<Vec<_>>()
-                .join(", ");
-            println!("pinned outline probe missing sample: {sample}");
+        for sequence in ["🚀", "👍🏽", "🇲🇽", "👨‍👩‍👧‍👦"] {
+            let galley = ctx.fonts_mut(|fonts| {
+                fonts.layout_no_wrap(sequence.to_owned(), font_id.clone(), egui::Color32::WHITE)
+            });
+            assert!(
+                galley.num_vertices > 0,
+                "system color font failed to rasterize representative sequence {sequence:?}"
+            );
         }
+        println!("glyphflick system emoji coverage: representative_rasterization=ok");
     }
 
     #[test]
-    fn glyphflick_font_set_excludes_unused_hack_face() {
-        let fonts = definitions();
+    fn font_set_keeps_ui_and_emoji_families_separate() {
+        let (fonts, status) = definitions();
 
-        assert_eq!(fonts.font_data.len(), 3);
-        assert!(!fonts.font_data.contains_key("Hack"));
-        assert_eq!(
-            fonts.families[&FontFamily::Proportional],
-            [UBUNTU, NOTO_EMOJI, EMOJI_ICON_FONT]
-        );
+        assert_eq!(fonts.families[&FontFamily::Proportional], [UBUNTU]);
+        assert_eq!(fonts.families[&FontFamily::Monospace], [UBUNTU]);
+
+        let emoji = &fonts.families[&FontFamily::Name(Arc::from(EMOJI_FAMILY))];
+        match status {
+            EmojiFontStatus::Mapped(_) => assert_eq!(emoji, [SYSTEM_EMOJI]),
+            EmojiFontStatus::Missing => assert_eq!(emoji, [UBUNTU]),
+        }
     }
 }
