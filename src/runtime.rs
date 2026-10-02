@@ -79,12 +79,12 @@ impl ApplicationHandler for Runtime {
             return;
         }
 
-        if matches!(event, WindowEvent::CloseRequested | WindowEvent::Destroyed) {
+        if matches!(&event, WindowEvent::CloseRequested | WindowEvent::Destroyed) {
             event_loop.exit();
             return;
         }
 
-        if matches!(event, WindowEvent::RedrawRequested) {
+        if matches!(&event, WindowEvent::RedrawRequested) {
             let egui_glow = self.egui_glow.as_mut().expect("egui runtime missing");
             let app = self.app.as_mut().expect("glyphflick app missing");
 
@@ -106,8 +106,8 @@ impl ApplicationHandler for Runtime {
             return;
         }
 
-        if let WindowEvent::Resized(physical_size) = event {
-            gl_window.resize(physical_size);
+        if let WindowEvent::Resized(physical_size) = &event {
+            gl_window.resize(*physical_size);
         }
 
         let response = self
