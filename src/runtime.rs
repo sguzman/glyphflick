@@ -206,7 +206,9 @@ impl GlutinWindowContext {
             } else {
                 gl_display
                     .create_context(&gl_config, &context_attributes)
-                    .or_else(|_| gl_display.create_context(&gl_config, &fallback_context_attributes))
+                    .or_else(|_| {
+                        gl_display.create_context(&gl_config, &fallback_context_attributes)
+                    })
                     .expect("failed to create OpenGL or OpenGL ES context")
             }
         };
