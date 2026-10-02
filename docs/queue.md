@@ -182,7 +182,7 @@ Acceptance:
 
 **Status: IN PROGRESS**
 
-Zero-dependency opt-in timing probes now exist behind `GLYPHFLICK_TIMING`.
+Zero-dependency timing probes now exist behind the compile-time Cargo feature `timing`; normal release builds compile them out.
 
 Currently instrumented:
 
@@ -194,7 +194,6 @@ Currently instrumented:
 
 Still needed:
 
-- [ ] first actually presented frame methodology;
 - [ ] first actually presented frame methodology;
 - [ ] visible dismissal measurement;
 - [ ] binary size;
