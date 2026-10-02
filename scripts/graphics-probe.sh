@@ -20,7 +20,7 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 
 mkdir -p target
-report="target/glyphflick-graphics-probe.txt"
+report="$(pwd)/target/glyphflick-graphics-probe.txt"
 : >"$report"
 
 echo "glyphflick graphics probe"
