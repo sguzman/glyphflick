@@ -54,7 +54,6 @@ impl fmt::Display for ClipboardError {
 
 impl std::error::Error for ClipboardError {}
 
-
 #[cfg(test)]
 mod tests {
     use super::{ClipboardBackend, WlCopyClipboard};
