@@ -118,6 +118,10 @@ impl ApplicationHandler for Runtime {
             if self.first_swap_pending {
                 self.first_swap_pending = false;
                 self.timing.mark_first_swap();
+                if self.timing.exit_after_first_swap() {
+                    event_loop.exit();
+                    return;
+                }
             }
             return;
         }
