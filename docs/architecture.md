@@ -4,26 +4,55 @@
 
 Keep Glyphflick small enough that its architecture explains the whole application rather than hiding it.
 
-The expected MVP is a single Rust binary with a few sharply separated modules.
+The MVP is a single Rust binary with a deliberately narrow Wayland/EGL runtime around egui.
 
-## Proposed module boundaries
+## Module boundaries
 
 ```text
 main
  |
+ +-- runtime      Wayland/winit + EGL/glutin + egui_glow event/render loop
  +-- app          egui state + interaction state machine
  +-- corpus       glyph records + bundled dataset adapter
  +-- search       normalization + ranking/filtering
+ +-- navigation   allocation-free result cursor movement
  +-- clipboard    copy contract + Wayland implementation
- +-- platform     narrowly scoped host/window behavior if needed
- +-- config       deferred; optional when it becomes real
+ +-- perf         compile-time optional timing probes
 ```
 
-The module names are provisional; the boundaries are the important part.
+The boundaries are intentional: UI/domain code should not depend on window-system or OpenGL setup.
+
+## Runtime architecture
+
+Glyphflick does **not** use eframe.
+
+The runtime is intentionally assembled from the narrower layers underneath it:
+
+- `winit` for a Wayland-only event loop/window;
+- `glutin` + `glutin-winit` for EGL/OpenGL context creation;
+- `egui_glow` for egui input translation and Glow rendering;
+- `egui` for the immediate-mode UI.
+
+Runtime features are trimmed aggressively:
+
+- Wayland enabled;
+- X11 disabled;
+- EGL enabled;
+- GLX disabled;
+- wgpu absent;
+- egui-winit OS clipboard feature absent;
+- egui link opening absent;
+- no eframe persistence/application framework.
+
+The event loop uses `ControlFlow::Wait`, so Glyphflick does not continuously poll while idle.
+
+Swap interval is requested as `DontWait`; the picker has no reason to wait for a display refresh boundary before presenting a ready frame.
+
+On Wayland, the window is expected to become visible when its first buffer is presented, avoiding a separate splash/blank-frame path.
 
 ## Data model
 
-A core glyph record should conceptually contain:
+A core glyph record conceptually contains:
 
 ```text
 Glyph {
@@ -35,59 +64,70 @@ Glyph {
 }
 ```
 
-The UI should not depend directly on a third-party emoji crate's public types. Adapt external corpus data into a project-owned model so the corpus implementation can change without infecting the application.
+The UI does not depend directly on a third-party emoji crate's public types. External corpus types terminate inside the corpus adapter.
 
 ## Corpus strategy
 
-MVP preference:
+MVP corpus requirements:
 
 - local;
 - deterministic;
-- bundled or compile-time accessible;
+- compile-time/bundled metadata;
 - no network;
-- fast to enumerate;
-- preserves multi-codepoint sequences;
-- exposes names and useful aliases.
+- preserves multi-codepoint sequences exactly;
+- canonical names and useful aliases;
+- no startup filesystem discovery.
 
-The corpus layer owns data adaptation, not ranking.
+The current adapter stores static emoji references and expands skin-tone variants into a compact index once per invocation. That construction cost is instrumented because even small startup work must earn its place.
 
 ## Search architecture
 
-Search should be a pure-ish component:
+Search is a deterministic component:
 
 ```text
 (query, corpus) -> ranked result indices
 ```
 
-Desired properties:
+Current behavior is deliberately simple:
 
-- deterministic;
-- allocation-conscious where useful;
-- testable without a GUI;
-- no async runtime;
-- no I/O in the search hot path.
+- linear scan over a small corpus;
+- reusable result/bucket vectors;
+- no per-query sort;
+- no fuzzy-search dependency;
+- no startup-built search index;
+- ASCII case-insensitive matching for the English canonical names/shortcodes.
 
-Normalization may precompute lowercase/searchable fields at startup if measurement supports it.
-
-Because the corpus is small by general search-engine standards, simplicity should win until benchmarks prove otherwise.
+This stays simple until measurements show search itself is material.
 
 ## UI architecture
 
-egui owns rendering and immediate-mode interaction, but not domain logic.
+egui owns rendering and immediate-mode interaction, not process/window lifecycle.
 
-The application state should hold:
+The application state holds:
 
 - query;
-- active result/keyboard cursor;
-- visible result ordering;
+- active result;
+- ranked result indices;
 - transient error state;
-- commit/cancel intent.
+- commit/cancel intent;
+- visible-grid bookkeeping.
 
-It should call into search and clipboard through narrow APIs.
+The app requests exit with a boolean; the runtime owns actual event-loop termination. This keeps the app testable without eframe or a Wayland session.
+
+## Keyboard navigation
+
+Navigation is a small index state machine rather than an additional widget tree.
+
+It performs:
+
+- constant-space row/column movement;
+- no allocations;
+- no animation;
+- direct scroll offset jumps when the selected row leaves the visible range.
 
 ## Clipboard abstraction
 
-The clipboard boundary is critical because Wayland selection ownership can outlive or depend on process lifetime.
+The clipboard boundary is intentionally separate from egui's OS clipboard integration.
 
 Conceptual interface:
 
@@ -95,131 +135,130 @@ Conceptual interface:
 Clipboard::copy(text) -> success/failure
 ```
 
-The UI must not care whether the implementation uses:
+The initial backend invokes `wl-copy` **only after a glyph is committed**.
 
-- a direct Wayland library;
-- a clipboard crate;
-- a small external helper such as `wl-copy`;
-- a detached ownership process.
+This is important for two reasons:
 
-What matters is the behavioral contract:
+1. clipboard ownership can survive the visible picker process;
+2. no clipboard helper or clipboard library initialization is paid on Glyphflick's launch path.
 
-1. return success only after clipboard ownership is valid;
-2. allow the visible UI to terminate;
-3. copied content remains pasteable afterward.
-
-The first implementation should optimize for correctness and low engineering risk. A later native backend can replace it if measurements justify removing an external helper.
+The direct egui runtime intentionally leaves egui-winit's OS clipboard feature disabled. Standard search-field paste can later be implemented on demand rather than paying clipboard initialization on every invocation.
 
 ## Process model
 
-MVP:
-
 ```text
-keybinding/launcher
+external keybinding/launcher
     |
     v
-glyphflick process
+Glyphflick process
     |
-    +-- render/search/select
-    |
-    +-- establish clipboard ownership
+    +-- Wayland/EGL init
+    +-- first egui frame
+    +-- search / navigate
+    +-- commit
+    +-- wl-copy establishes selection
     |
     v
-exit visible application
+event loop exits immediately
 ```
 
-No daemon is required.
+No resident Glyphflick daemon is required.
 
-If the chosen clipboard mechanism needs a background ownership process after the UI exits, that process is an implementation detail of the clipboard backend, not a reason to convert the entire app into a resident daemon.
+If `wl-copy` leaves a narrowly scoped clipboard-provider process alive, that is clipboard ownership, not a Glyphflick service.
 
 ## Window/compositor boundary
 
-Glyphflick creates a native application window.
+Glyphflick exposes:
 
-It may expose stable properties such as application ID/title that a compositor can match.
+- Wayland application ID: `glyphflick`;
+- title: `Glyphflick`;
+- fixed transient-picker dimensions.
 
 It does not:
 
 - edit Hyprland config;
 - install keybindings;
-- assume a particular modifier key;
-- embed Hyprland IPC into core behavior without a compelling reason.
+- assume a particular modifier;
+- embed Hyprland IPC in core behavior.
 
 ## Dependency policy
 
-Every runtime dependency should answer at least one of:
-
-- Does it materially simplify correctness?
-- Does it reduce startup/interaction latency risk?
-- Does it provide data we would otherwise have to maintain?
-- Is replacing it ourselves clearly worse?
+Every runtime dependency must justify startup cost.
 
 Avoid:
 
-- general async runtimes for a synchronous picker;
-- database engines for tiny local state;
-- serialization frameworks before configuration/persistence exists;
-- plugin frameworks;
-- logging stacks disproportionate to the program.
+- general async runtimes;
+- databases;
+- serialization/config frameworks before needed;
+- logging stacks;
+- plugin systems;
+- runtime font discovery without measurement;
+- convenience framework layers that initialize unused subsystems.
+
+A useful abstraction can still be the wrong abstraction for a process-per-invocation utility.
 
 ## Performance strategy
 
-Measure before exotic optimization, but design away obvious startup costs.
+Remove obvious unused work before profiling, then measure the rest.
 
-Likely levers:
+Current latency-oriented choices:
 
-- minimal eframe feature set;
-- lightweight renderer choice based on measured startup behavior;
-- pre-normalized corpus search fields;
-- virtualized result rendering;
-- no image assets in the hot path;
-- no dynamic network/data loading;
-- release LTO/strip settings after profiling;
-- avoid unnecessary filesystem access on launch.
+- direct egui_glow runtime instead of eframe;
+- Wayland-only winit;
+- EGL-only glutin;
+- no OS clipboard initialization during startup;
+- no application icon decode path;
+- no vsync wait request;
+- event-loop `Wait`, not `Poll`;
+- virtualized result rows;
+- allocation-reused search;
+- index-only keyboard navigation;
+- compile-time-zero-cost production instrumentation;
+- no startup files/network/config.
+
+The remaining major unknowns are EGL/context creation, default-font initialization/coverage, corpus construction, and clipboard establishment.
 
 ## Testing strategy
 
 ### Unit tests
 
-- query normalization;
 - matching/ranking;
 - alias behavior;
 - Unicode sequence preservation;
-- keyboard selection index movement;
-- cancel does not invoke clipboard commit;
-- clipboard errors keep application in recoverable state.
+- keyboard selection movement;
+- clipboard success/failure state transitions.
 
 ### Integration-ish tests
 
-Abstract clipboard backend to allow a fake implementation:
+Fake the clipboard boundary to prove:
 
-- selecting result sends exact text;
+- selected text remains exact;
 - successful copy requests exit;
-- failed copy does not request success exit.
+- failed copy remains recoverable;
+- cancellation never writes the clipboard.
 
 ### Host QA
 
-Some behavior cannot be proven by unit tests alone:
+Real Wayland validation is still required for:
 
-- actual Wayland clipboard persistence;
-- focus behavior;
-- compositor placement;
+- actual process startup/first presentation;
+- focus;
+- clipboard persistence;
+- compositor-visible app identity;
 - emoji font rendering;
-- perceived startup latency.
+- repeated invocation.
 
-Host QA should be a narrow final layer, not a substitute for automated validation.
+Host QA is the final layer, not a substitute for automated/static validation.
 
 ## Packaging
 
-Deferred until MVP works.
+Deferred until the runtime is proven.
 
 Likely eventual targets:
 
 - release binary;
-- Arch package/AUR-friendly packaging;
-- generic install instructions.
-
-Packaging must not become a prerequisite to local development.
+- Arch/AUR-friendly package;
+- generic installation documentation.
 
 ## Security/privacy
 
@@ -229,5 +268,3 @@ Normal operation should:
 - execute no remote content;
 - store no telemetry;
 - require no elevated privileges.
-
-User-defined future glyph packs/configuration should be treated as data, not executable code.
