@@ -1,59 +1,44 @@
 # ADR 0001: Rust + egui for the native picker
 
-- Status: Accepted
+- Status: Accepted for Rust + egui; **eframe portion superseded by ADR 0006**
 - Date: 2026-10-02
 
 ## Context
 
-Glyphflick needs to be a small native Linux/Wayland utility with low startup latency, straightforward distribution, and a compact immediate interaction surface.
+Glyphflick needs to be a small native Linux/Wayland utility with low startup latency and a compact immediate interaction surface.
 
-The chosen stack should avoid browser runtimes and should make it easy to keep domain logic in a single executable.
-
-## Decision
+## Original decision
 
 Implement Glyphflick in Rust and use egui/eframe for the native UI.
 
-## Rationale
+## Current interpretation
+
+The Rust + egui decision remains accepted.
+
+The eframe runtime choice was deliberately removed after source-level inspection showed that eframe's native dependency configuration enables egui-winit OS clipboard support even when Glyphflick does not use that clipboard path.
+
+ADR 0006 replaces eframe with a direct Wayland/EGL + egui_glow runtime.
+
+## Why Rust remains
 
 Rust provides:
 
-- a small deployable native binary;
+- one native binary;
+- explicit dependency/process control;
 - strong Unicode/string tooling;
-- explicit control over dependencies and process behavior;
-- straightforward separation of platform/UI/domain modules.
+- clear separation between runtime and domain logic.
+
+## Why egui remains
 
 egui provides:
 
-- an immediate-mode model suited to a transient picker;
-- fast iteration on grid/search interaction;
-- native Linux support;
-- no need to construct a large retained widget hierarchy.
+- an immediate-mode model that maps well to a transient picker;
+- a small interaction state surface;
+- efficient virtualized rendering primitives;
+- no need for a large retained widget hierarchy.
 
-## Constraints
+## Constraint
 
-Using egui does not excuse poor startup behavior.
+The UI toolkit is subordinate to latency.
 
-The implementation must:
-
-- minimize enabled features;
-- measure renderer/backend startup cost;
-- avoid heavyweight dependencies around egui;
-- keep search/corpus/clipboard logic independent of egui.
-
-## Consequences
-
-Positive:
-
-- rapid implementation;
-- coherent single-language codebase;
-- UI state maps naturally to one-shot interaction.
-
-Negative/risks:
-
-- eframe startup cost must be measured rather than assumed negligible;
-- emoji rendering quality depends partly on the host font/rendering stack;
-- native Wayland behavior may require targeted platform handling.
-
-## Revisit when
-
-Reconsider the UI framework only if measured startup/rendering behavior prevents the product from meeting its latency goals.
+Framework convenience is not a reason to keep a layer whose unavoidable initialization is unnecessary for Glyphflick.
