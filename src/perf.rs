@@ -12,6 +12,8 @@ pub struct Stamp;
 pub struct Timing {
     #[cfg(feature = "timing")]
     process_start: Instant,
+    #[cfg(feature = "timing")]
+    exit_after_first_swap: bool,
 }
 
 impl Default for Timing {
@@ -20,6 +22,8 @@ impl Default for Timing {
         Self {
             #[cfg(feature = "timing")]
             process_start: Instant::now(),
+            #[cfg(feature = "timing")]
+            exit_after_first_swap: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_SWAP").is_some(),
         }
     }
 }
@@ -105,6 +109,12 @@ impl Timing {
 
         #[cfg(not(feature = "timing"))]
         let _ = self;
+    }
+
+    #[cfg(feature = "timing")]
+    #[inline(always)]
+    pub const fn exit_after_first_swap(self) -> bool {
+        self.exit_after_first_swap
     }
 
     #[cfg(feature = "timing")]
