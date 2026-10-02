@@ -24,7 +24,8 @@ fn main() -> eframe::Result {
             .with_min_inner_size([WINDOW_WIDTH, WINDOW_HEIGHT])
             .with_max_inner_size([WINDOW_WIDTH, WINDOW_HEIGHT])
             .with_decorations(false)
-            .with_resizable(false),
+            .with_resizable(false)
+            .with_icon(egui::IconData::default()),
         renderer: eframe::Renderer::Glow,
         multisampling: 0,
         depth_buffer: 0,
