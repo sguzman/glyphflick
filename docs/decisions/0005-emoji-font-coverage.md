@@ -1,6 +1,6 @@
 # ADR 0005: Emoji font coverage must be solved against launch latency
 
-- Status: Proposed / measurement pending
+- Status: In progress / shipped-font coverage measurement pending
 - Date: 2026-10-02
 
 ## Context
@@ -16,38 +16,25 @@ That creates two simultaneous requirements:
 
 This is a process-per-invocation utility. Font work is therefore part of the startup critical path.
 
-## Verified baseline
+## Verified current baseline
 
-The current `egui/default_fonts` feature embeds the 0.36.2 default font package, including:
+Glyphflick no longer enables the generic `egui/default_fonts` feature. It installs an explicit deterministic font definition containing only:
 
-- Ubuntu Light for proportional UI text;
-- Hack for monospace text;
+- Ubuntu Light for UI text;
 - Noto Emoji;
 - emoji-icon-font.
 
-No eframe/system-font provider is installed by Glyphflick's direct runtime.
+The unused Hack code face has been removed.
 
-Therefore the baseline is:
+No eframe/system-font provider is installed by Glyphflick's direct runtime. The current baseline is therefore:
 
 - deterministic;
 - offline;
 - no runtime system-font search;
-- approximately 1,216 documented emoji supported;
-- incomplete relative to the Unicode 17 corpus.
+- no unused Hack face;
+- still potentially incomplete relative to the Unicode 17 corpus.
 
-## Immediate optimization opportunity
-
-Glyphflick does not need a dedicated code font.
-
-After the runtime reaches compile-clean validation, measure replacing `egui/default_fonts` with an explicit font definition containing only the faces the picker actually uses:
-
-- Ubuntu Light;
-- Noto Emoji;
-- emoji-icon-font if its additional coverage is useful.
-
-This may remove Hack and an unused fallback path from first-frame font initialization.
-
-Do not land that change before a clean baseline build exists; otherwise font work muddies runtime validation.
+The exact shipped-font scalar coverage is now measured from the font bytes through egui's own `has_glyph` API in CI instead of being inferred from package descriptions.
 
 ## Candidate strategies
 
@@ -64,19 +51,19 @@ Disadvantage:
 - incomplete modern emoji coverage;
 - includes at least one font Glyphflick likely does not need.
 
-### B. Slimmed deterministic egui font subset
+### B. Slimmed deterministic egui font subset — implemented baseline
 
 Advantages:
 
 - preserves offline deterministic startup;
-- may remove unused font parsing/fallback work;
+- removes the unused Hack face;
 - no new font asset source.
 
 Disadvantage:
 
 - same fundamental emoji coverage ceiling unless the source font changes.
 
-This is the preferred first latency experiment after compile validation.
+This is now the active baseline rather than a future experiment.
 
 ### C. Explicitly bundled newer monochrome emoji dependency
 
@@ -148,10 +135,10 @@ Do not optimize binary size at the expense of launch latency merely because size
 
 Once the build is validated:
 
-1. record the current default-font first-swap baseline;
-2. measure a slimmed deterministic font subset;
-3. quantify renderable representative emoji coverage;
-4. only then evaluate a newer bundled emoji source if coverage remains unacceptable.
+1. quantify the active three-face bundle's scalar coverage in CI;
+2. record first-swap/font-initialization timing on the target host;
+3. compare only against a newer deterministic emoji source if coverage remains unacceptable;
+4. retain the smaller solution unless broader coverage justifies its measured launch cost.
 
 Representative coverage must include:
 
