@@ -13,29 +13,14 @@ concurrency:
 
 jobs:
   release:
-    if: ${{ startsWith(github.event.head_commit.message, 'chore(release): prepare ') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
-      - name: Check out exact release commit
+      - name: Check out exact commit
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
-      - name: Install native build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            fonts-noto-color-emoji \
-            libwayland-dev \
-            libxkbcommon-dev \
-            pkg-config
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
 
       - name: Resolve release identity
         id: release
@@ -44,8 +29,15 @@ jobs:
           set -euo pipefail
           version="$(awk -F'"' '/^version = / { print $2; exit }' Cargo.toml)"
           subject="$(git log -1 --pretty=%s)"
-          expected="chore(release): prepare $version"
+          prefix="chore(release): prepare "
 
+          if [[ "$subject" != "$prefix"* ]]; then
+            echo "should_release=false" >>"$GITHUB_OUTPUT"
+            echo "ordinary main commit; no release"
+            exit 0
+          fi
+
+          expected="$prefix$version"
           if [[ "$subject" != "$expected" ]]; then
             echo "release commit subject mismatch" >&2
             echo "expected: $expected" >&2
@@ -65,25 +57,48 @@ jobs:
             exit 1
           fi
 
+          echo "should_release=true" >>"$GITHUB_OUTPUT"
           echo "version=$version" >>"$GITHUB_OUTPUT"
           echo "tag=$tag" >>"$GITHUB_OUTPUT"
 
+      - name: Install native build dependencies
+        if: steps.release.outputs.should_release == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            fonts-noto-color-emoji \
+            libwayland-dev \
+            libxkbcommon-dev \
+            pkg-config
+
+      - name: Install Rust
+        if: steps.release.outputs.should_release == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
       - name: Format
+        if: steps.release.outputs.should_release == 'true'
         run: cargo fmt --all -- --check
 
       - name: Validate probe shells
+        if: steps.release.outputs.should_release == 'true'
         run: bash -n scripts/*.sh
 
       - name: Check
+        if: steps.release.outputs.should_release == 'true'
         run: cargo check --locked
 
       - name: Test
+        if: steps.release.outputs.should_release == 'true'
         run: cargo test --locked -- --nocapture
 
       - name: Clippy
+        if: steps.release.outputs.should_release == 'true'
         run: cargo clippy --all-targets --all-features --locked -- -D warnings
 
       - name: Reject forbidden runtime dependencies
+        if: steps.release.outputs.should_release == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -95,9 +110,11 @@ jobs:
           fi
 
       - name: Build release binary
+        if: steps.release.outputs.should_release == 'true'
         run: cargo build --release --locked --bin glyphflick
 
       - name: Package versioned executable
+        if: steps.release.outputs.should_release == 'true'
         id: package
         shell: bash
         run: |
@@ -118,6 +135,7 @@ jobs:
           stat -c 'release_bytes=%s' target/release/glyphflick
 
       - name: Build release notes
+        if: steps.release.outputs.should_release == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -139,6 +157,7 @@ jobs:
           EOF
 
       - name: Publish GitHub Release
+        if: steps.release.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
