@@ -41,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           tree="$(cargo tree --locked --prefix none)"
-          forbidden='^(arboard|smithay-clipboard|x11-dl|x11rb|glutin_glx_sys|wgpu|egui_glow|glutin|glutin-winit)( |$)'
+          forbidden='^(arboard|smithay-clipboard|x11-dl|x11rb|wgpu|glow|egui_glow|glutin|glutin-winit|glutin_egl_sys|glutin_glx_sys|khronos-egl)( |$)'
           if grep -E "$forbidden" <<<"$tree"; then
             echo "Forbidden latency/platform dependency detected"
             exit 1
