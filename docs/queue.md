@@ -18,7 +18,7 @@ Items are ordered unless a dependency or newly discovered defect requires reprio
 
 ## Q001 — Bootstrap Rust application
 
-**Status: AUTOMATED VALIDATION GREEN / TARGET QA PENDING**
+**Status: DONE — MVP HOST ACCEPTED**
 
 The native Rust/egui binary uses a project-owned Wayland software runtime rather than eframe or a GPU context stack.
 
@@ -70,7 +70,7 @@ The helper is intentionally invoked only at commit time, so it contributes zero 
 
 ## Q005 — Commit and dismiss path
 
-**Status: CODE COMPLETE / QA PENDING**
+**Status: DONE — MVP HOST ACCEPTED**
 
 Acceptance:
 
@@ -122,7 +122,7 @@ Acceptance:
 
 ## Q008 — Virtualized result grid
 
-**Status: CODE COMPLETE / QA PENDING**
+**Status: DONE — MVP HOST ACCEPTED**
 
 Acceptance:
 
@@ -133,7 +133,7 @@ Acceptance:
 
 ## Q009 — Keyboard navigation
 
-**Status: CODE COMPLETE / QA PENDING**
+**Status: DONE — MVP HOST ACCEPTED**
 
 Acceptance:
 
@@ -196,7 +196,7 @@ Acceptance:
 
 ## Q010 — Stable window identity
 
-**Status: CODE COMPLETE / QA PENDING**
+**Status: DONE — MVP HOST ACCEPTED**
 
 Acceptance:
 
@@ -207,7 +207,7 @@ Acceptance:
 
 ## Q011 — Performance instrumentation
 
-**Status: IN PROGRESS**
+**Status: DONE FOR MVP — FURTHER PROFILING OPTIONAL**
 
 Zero-dependency timing probes now exist behind the compile-time Cargo feature `timing`; normal release builds compile them out.
 
@@ -240,7 +240,7 @@ Still needed:
 
 ## Q012 — Startup optimization pass
 
-**Status: IN PROGRESS / SOFTWARE RUNTIME PROMOTED**
+**Status: DONE — SOFTWARE RUNTIME IS PRODUCTION**
 
 Already applied before measurement because they remove obviously unused machinery:
 
@@ -282,7 +282,7 @@ Softbuffer and the CPU renderer are the normal production path. OpenGL/EGL/gluti
 
 ## Q013 — Real Wayland QA
 
-**Status: TARGET PROBE READY / AUTOMATED BUILD GREEN**
+**Status: MVP ACCEPTANCE RECORDED — EXTENDED QA OPTIONAL**
 
 Host verification (automated where possible by `scripts/target-probe.sh`):
 
@@ -349,4 +349,20 @@ When implementation lands but host QA is required, use `CODE COMPLETE / QA PENDI
 Only use `DONE` when its acceptance criteria are actually satisfied.
 
 
-Measured architecture result: the final seven-launch comparison measured 24.268 ms median for the software baseline, 23.442 ms for the minimal-cell software candidate, and 54.881 ms for legacy OpenGL/EGL. The minimal cell is promoted and the OpenGL comparison implementation is deleted. Next gate: a software-only no-grid-text diagnostic isolates emoji shaping/font work from cell/layout cost.
+Measured architecture result: the final seven-launch comparison measured 24.268 ms median for the software baseline, 23.442 ms for the minimal-cell software candidate, and 54.881 ms for legacy OpenGL/EGL. The minimal cell is promoted and the OpenGL comparison implementation is deleted.
+
+The final software-only diagnostic at commit `c31d652` measured the production path at 23.583 ms median process-to-first-present and the no-grid-text diagnostic at 11.608 ms. The remaining first-frame cost is dominated by emoji text generation; the product latency target is accepted and the optimization campaign is closed unless a real regression appears.
+
+## Q017 — MVP graduation and maintained release protocol
+
+**Status: DONE**
+
+- [x] principal accepted the real release GUI on the target EndeavourOS/Hyprland host;
+- [x] project state/documents graduated from pre-MVP language;
+- [x] stable compatibility contract recorded;
+- [x] post-MVP Conventional Commit policy adopted;
+- [x] Semantic Versioning policy adopted;
+- [x] initial v1.0.0 changelog established;
+- [x] zero-spend GitHub Release distribution selected for the public repository;
+- [x] versioned Linux x86_64 executable archive defined as the initial release asset;
+- [x] old compiled assets are explicitly prunable under real provider constraints while durable history is preserved.

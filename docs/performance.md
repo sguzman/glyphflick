@@ -347,3 +347,31 @@ The minimal cell saves 0.598 ms in the grid and 0.826 ms end-to-end at the media
 The OpenGL comparison path has served its purpose. Repeated measurements established that EGL/context startup overwhelms the faster GPU paint for this one-shot utility. The legacy OpenGL/EGL code and direct dependencies are removed rather than retained as a dormant alternate architecture.
 
 The next software-only diagnostic suppresses glyph text painting while retaining cell allocation/interaction. Its delta isolates how much of the remaining ~10 ms grid cost comes from emoji text shaping/font work and the resulting raster workload.
+
+
+### Final MVP latency gate and optimization closure
+
+At commit `c31d652`, the final seven-launch software-only diagnostic measured:
+
+| Metric | Production | No-grid-text diagnostic |
+| --- | ---: | ---: |
+| App UI p50 | 10.539 ms | 0.285 ms |
+| Grid p50 | 10.280 ms | 0.031 ms |
+| egui run p50 | 11.071 ms | 0.488 ms |
+| Texture update p50 | 0.410 ms | 0.110 ms |
+| Software raster p50 | 8.950 ms | 8.002 ms |
+| First populated present p50 | **23.583 ms** | 11.608 ms |
+
+Both modes rendered the same 90-cell interaction workload; only glyph text painting was suppressed in the diagnostic. The grid delta is therefore almost entirely emoji text shaping/font work, while roughly 8 ms of software raster cost remains even without glyph text.
+
+This measurement closes the MVP optimization campaign. The production release was then exercised directly on the target EndeavourOS/Hyprland host and accepted by the principal as extremely fast.
+
+The release build is the product. Cargo debug builds are intentionally not latency targets and may be dramatically slower because the CPU renderer and first-frame text work depend heavily on optimization.
+
+Future performance work requires one of:
+
+- a measured regression against the accepted v1 baseline;
+- a concrete user-visible latency problem;
+- a new feature whose critical-path cost must be evaluated.
+
+Do not continue optimization archaeology merely because a lower number is theoretically possible.

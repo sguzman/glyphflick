@@ -13,7 +13,7 @@ Every implementation change should aim to pass:
 - `cargo clippy --all-targets --all-features -- -D warnings`;
 - formatting check.
 
-Exact CI policy can be added when the first Rust crate exists.
+CI enforces formatting, locked dependency resolution, check, tests, clippy, and a separate runtime-dependency/binary-size budget.
 
 ### 2. Unit tests
 
@@ -139,18 +139,20 @@ Run from the repository root:
 bash scripts/target-probe.sh
 ```
 
-This probe performs the host-dependent checks that cannot be established in GitHub CI:
+The current target probe is software-runtime-only. It:
 
-1. builds the release binary with the compile-time `timing` feature;
-2. performs repeated real Wayland launches that exit immediately after the first successful EGL buffer swap;
-3. reports first-run and repeated-series timing for EGL/GL setup, egui initialization, font mapping, corpus initialization, first UI pass, and first swap;
-4. verifies the target host's actual Noto Color Emoji coverage and representative sequence rasterization;
-5. invokes Glyphflick's real `WlCopyClipboard` backend, lets the Rust test process exit, verifies the selection with `wl-paste`, and restores the previous text clipboard when possible.
+1. runs the production/no-grid-text latency probe on the live Wayland session;
+2. verifies target Noto Color Emoji coverage and representative complex sequence rasterization;
+3. invokes Glyphflick's real `WlCopyClipboard` backend;
+4. verifies clipboard persistence with `wl-paste`;
+5. restores the prior text clipboard when possible.
 
-The auto-exit switch exists only when the `timing` Cargo feature is compiled. Normal release builds contain no environment check or benchmark auto-exit path.
+The production latency sub-probe exits after the first successful **software present**, not an EGL/GL swap. OpenGL/EGL comparison machinery is historical and is not part of current QA.
 
-The first measured launch is reported separately but must not be called a controlled cold-cache measurement. The script does not flush kernel filesystem caches or require elevated privileges.
+The normal release build remains persistent until selection/cancel; benchmark auto-exit behavior exists only in builds compiled with the `timing` feature.
 
-The generated concise report is:
+## MVP host acceptance
 
-`target/glyphflick-target-probe.txt`
+On 2026-10-02 the principal ran the real release GUI on the target EndeavourOS/Hyprland host and explicitly accepted the MVP and its release-build responsiveness.
+
+That acceptance closes the MVP gate. Extended host-matrix checks remain useful maintenance evidence but are no longer prerequisites pretending the product has not shipped.

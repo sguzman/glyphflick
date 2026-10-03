@@ -45,8 +45,15 @@ Production instrumentation must be zero-cost when disabled. Benchmark-only code 
 
 ## Repository workflow
 
+Glyphflick is post-MVP. Commit history is now maintained product protocol.
+
 - Prefer direct commits to the default branch for owner-directed work.
 - Do not create PR ceremony unless specifically requested.
+- Use Conventional Commit structure for every post-MVP commit.
+- Use concise imperative subjects and coherent semantic units.
+- `feat` normally signals a minor release; `fix` and `perf` normally signal patch; breaking changes use `!` and a migration explanation when relevant.
+- `docs`, `test`, `ci`, `refactor`, `style`, `build`, and `chore` do not themselves force a release.
+- Actual compatibility semantics outrank a mistaken commit prefix.
 - Keep commits coherent and descriptive.
 - Update documentation when implementation changes product behavior or architecture.
 - Use ADRs for decisions that constrain future implementation.
@@ -84,6 +91,16 @@ Do:
 - Benchmark launch/search before adding heavyweight dependencies.
 - Prefer allocation reuse in repeated interaction paths.
 - Keep keyboard navigation and other hot-path state transitions allocation-free.
+
+## Versioning and release ownership
+
+The accepted MVP establishes the maintained `v1.0.0` line. Read `docs/versioning.md` before changing a stable contract or preparing a release.
+
+The director owns routine version classification, changelog preparation, and release bookkeeping. The principal should not be asked to choose ordinary major/minor/patch bumps.
+
+Application releases use GitHub Releases with versioned executable/archive assets when the zero-spend release path remains available. Do not enable paid release hosting, paid build minutes, paid package storage, or paid artifact retention without explicit principal authorization.
+
+If a real provider constraint ever blocks current distribution, older compiled release assets may be pruned before durable release history. Preserve tags, release notes, changelog entries, source commits, and version identity whenever possible.
 
 ## Definition of done
 

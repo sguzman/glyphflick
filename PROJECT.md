@@ -116,5 +116,13 @@ Large adjacent capabilities should be isolated behind optional modules or deferr
 - Product formalized: yes
 - Architecture formalized: yes
 - UX formalized: yes
-- Implementation: not started
+- Implementation: **MVP accepted; maintained v1 line**
+- MVP graduation: **2026-10-02**
+- Graduation version: **v1.0.0**
+- Production runtime: **Wayland + egui + project CPU rasterizer + softbuffer**
+- Target-host acceptance: **real release GUI exercised on EndeavourOS/Hyprland and accepted by the principal**
+- Measured production startup: **23.583 ms median process-to-first-populated-present over seven target-host launches**
+- Release distribution: **versioned GitHub Release assets**
 - Host integration: explicitly not modified by this repository
+
+The MVP success gate is closed. Future work is maintenance or post-MVP product development, not unfinished MVP construction.

@@ -1,5 +1,9 @@
 # Roadmap
 
+**MVP graduation: complete — v1.0.0 accepted 2026-10-02.**
+
+Phases 0-5 describe the path that produced the accepted v1 baseline. Phases 6+ are optional post-MVP product development, not unfinished MVP debt.
+
 This roadmap is ordered by product risk, not by feature excitement.
 
 ## Phase 0 — Formalization
@@ -20,6 +24,9 @@ Exit condition:
 The project can be implemented without rediscovering what it is supposed to be.
 
 ## Phase 1 — Minimal vertical slice
+
+**Status: complete for v1.0.0**
+
 
 Goal: prove the entire critical path with the smallest real application.
 
@@ -42,6 +49,9 @@ A real Wayland session can invoke the program, select one of a few glyphs, obser
 
 ## Phase 2 — Real corpus and search
 
+**Status: complete for v1.0.0**
+
+
 Goal: turn the vertical slice into an actually useful picker.
 
 Deliver:
@@ -61,6 +71,9 @@ The complete bundled emoji set is responsive and searchable without visible stal
 
 ## Phase 3 — Keyboard-complete interaction
 
+**Status: complete for v1.0.0**
+
+
 Goal: make pointer use optional.
 
 Deliver:
@@ -77,6 +90,9 @@ Exit condition:
 The common workflow can be completed without touching the mouse.
 
 ## Phase 4 — Performance pass
+
+**Status: complete for v1.0.0**
+
 
 Goal: make the picker feel primitive-fast rather than merely acceptable.
 
@@ -106,6 +122,9 @@ Known bottlenecks are measured and the remaining latency is acceptable in repeat
 
 ## Phase 5 — Reliability and host polish
 
+**Status: MVP acceptance satisfied; further hardening is maintenance**
+
+
 Deliver:
 
 - robust clipboard error path;
@@ -121,6 +140,9 @@ Repeated daily use is boringly reliable.
 
 ## Phase 6 — Personal utility features
 
+**Status: optional post-MVP**
+
+
 Only after the base picker is excellent:
 
 - recents;
@@ -133,6 +155,9 @@ Only after the base picker is excellent:
 These should remain cheap on startup.
 
 ## Phase 7 — Beyond emoji
+
+**Status: optional post-MVP**
+
 
 Potential corpora:
 

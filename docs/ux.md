@@ -43,7 +43,7 @@ On launch:
 
 ## Layout
 
-MVP surface:
+v1 surface:
 
 - compact window;
 - search field at top;
@@ -62,11 +62,19 @@ Desired behavior:
 - transient;
 - compact;
 - visually centered or compositor-positioned;
-- not resizable for MVP unless resizing proves useful;
+- not resizable in v1 unless resizing proves useful;
 - no workflow-obstructing decorations;
 - no lingering after commit/cancel.
 
 Exact compositor placement is integration policy, not application ownership.
+
+### Tiling-layout safety
+
+The desired deployment behavior is overlay-like: summoning Glyphflick must not meaningfully disturb the existing tiling layout.
+
+Glyphflick supplies a stable application identity and a compact fixed-size undecorated window, but portable Wayland toplevel APIs do not make compositor placement policy an application-owned contract. On Hyprland, guaranteed floating/centering belongs to compositor integration rather than application-side layer-shell complexity.
+
+The accepted target-host behavior appeared over existing windows during testing and did not produce a reported layout disruption. If a future Hyprland configuration needs an explicit float rule, that remains host integration work and must not be silently written by this repository.
 
 ## Search field
 
@@ -74,7 +82,7 @@ Properties:
 
 - focused on launch;
 - clear placeholder;
-- query retained only for the lifetime of the invocation in MVP;
+- query retained only for the lifetime of the invocation in v1;
 - Ctrl+A and standard editing behavior should work naturally;
 - clearing the query restores default results.
 
@@ -90,7 +98,7 @@ Secondary information:
 
 - accessible name available by tooltip or equivalent;
 - selection/highlight state for keyboard navigation;
-- no always-visible labels under every cell in MVP unless testing shows visual ambiguity is too high.
+- no always-visible labels under every cell in v1 unless testing shows visual ambiguity is too high.
 
 ## Pointer behavior
 
@@ -98,11 +106,11 @@ Secondary information:
 - Primary click: commit immediately.
 - No double click.
 - No separate Copy button.
-- No context menu in MVP.
+- No context menu in v1.
 
 ## Keyboard behavior
 
-Required eventual MVP behavior:
+Required v1 behavior:
 
 - typing: search;
 - Arrow keys: move active selection;
