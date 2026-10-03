@@ -15,7 +15,7 @@ No tray application. No persistent main window. No browser UI. No Electron. No w
 
 ## Status
 
-**MVP accepted on the target EndeavourOS/Hyprland host. Glyphflick is graduating to the maintained v1 release line.**
+**Glyphflick v1.0.0 — maintained MVP release.**
 
 The accepted MVP has a real native GUI, a local Unicode emoji corpus, deterministic ranked search, a virtualized grid, keyboard and pointer selection, exact clipboard copy, Escape cancellation, and one-shot dismissal.
 

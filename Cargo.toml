@@ -1,10 +1,11 @@
 [package]
 name = "glyphflick"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.95"
 description = "A summon-pick-copy-disappear glyph picker for Wayland desktops"
 repository = "https://github.com/sguzman/glyphflick"
+publish = false
 
 [features]
 default = []

@@ -4,6 +4,7 @@
 
 - regime: **maintained**
 - MVP accepted: **2026-10-02**
+- current release: **v1.0.0**
 - graduation release: **v1.0.0**
 - tag scheme: **vX.Y.Z**
 - canonical release host: **GitHub Releases**
