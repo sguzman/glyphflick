@@ -76,7 +76,7 @@ struct ProbeRuntime {
     window: Option<Rc<Window>>,
     surface: Option<Surface<OwnedDisplayHandle, Rc<Window>>>,
     egui_ctx: Option<egui::Context>,
-    egui_winit: Option<egui_winit::State>,
+    egui_winit: Option<egui_glow::egui_winit::State>,
     app: Option<GlyphflickApp<WlCopyClipboard>>,
     textures: TextureStore,
     first_present: bool,
@@ -124,7 +124,7 @@ impl ApplicationHandler for ProbeRuntime {
         let ctx = egui::Context::default();
 
         let egui_winit_start = Instant::now();
-        let egui_winit = egui_winit::State::new(
+        let egui_winit = egui_glow::egui_winit::State::new(
             ctx.clone(),
             egui::ViewportId::ROOT,
             event_loop,
