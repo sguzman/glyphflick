@@ -162,7 +162,8 @@ run_software_ui() {
 
   for ((run = 1; run <= runs; run++)); do
     printf -- "--- run %d ---\n" "$run" >>"$log"
-    ./target/release/glyphflick-software-ui-probe 2>>"$log"
+    GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT=1 \
+      ./target/release/glyphflick-software-ui-probe 2>>"$log"
   done
 
   for key in \
@@ -170,6 +171,7 @@ run_software_ui() {
     context_init_us \
     startup_to_resumed_us \
     window_surface_init_us \
+    egui_winit_init_us \
     egui_app_init_us \
     egui_run_us \
     tessellate_us \

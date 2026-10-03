@@ -61,8 +61,11 @@ fn main() -> Result<(), winit::error::EventLoopError> {
         window: None,
         surface: None,
         egui_ctx: None,
+        egui_winit: None,
         app: None,
         textures: TextureStore::default(),
+        first_present: true,
+        exit_after_first_present: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT").is_some(),
     };
     event_loop.run_app(&mut runtime)
 }
@@ -73,8 +76,11 @@ struct ProbeRuntime {
     window: Option<Rc<Window>>,
     surface: Option<Surface<OwnedDisplayHandle, Rc<Window>>>,
     egui_ctx: Option<egui::Context>,
+    egui_winit: Option<egui_winit::State>,
     app: Option<GlyphflickApp<WlCopyClipboard>>,
     textures: TextureStore,
+    first_present: bool,
+    exit_after_first_present: bool,
 }
 
 impl ApplicationHandler for ProbeRuntime {
@@ -95,15 +101,15 @@ impl ApplicationHandler for ProbeRuntime {
             event_loop
                 .create_window(
                     Window::default_attributes()
-                        .with_title("Glyphflick software UI probe")
+                        .with_title("Glyphflick software candidate")
                         .with_inner_size(size)
                         .with_min_inner_size(size)
                         .with_max_inner_size(size)
                         .with_resizable(false)
                         .with_decorations(false)
                         .with_name(
-                            "glyphflick-software-ui-probe",
-                            "glyphflick-software-ui-probe",
+                            "glyphflick-software-candidate",
+                            "glyphflick-software-candidate",
                         ),
                 )
                 .expect("failed to create Wayland probe window"),
@@ -115,8 +121,23 @@ impl ApplicationHandler for ProbeRuntime {
             surface_start.elapsed().as_micros()
         );
 
-        let app_start = Instant::now();
         let ctx = egui::Context::default();
+
+        let egui_winit_start = Instant::now();
+        let egui_winit = egui_winit::State::new(
+            ctx.clone(),
+            egui::ViewportId::ROOT,
+            event_loop,
+            None,
+            event_loop.system_theme(),
+            None,
+        );
+        eprintln!(
+            "glyphflick software-ui timing egui_winit_init_us={}",
+            egui_winit_start.elapsed().as_micros()
+        );
+
+        let app_start = Instant::now();
         let app = GlyphflickApp::new(&ctx, WlCopyClipboard, Timing::default());
         eprintln!(
             "glyphflick software-ui timing egui_app_init_us={}",
@@ -127,6 +148,7 @@ impl ApplicationHandler for ProbeRuntime {
         self.window = Some(window);
         self.surface = Some(surface);
         self.egui_ctx = Some(ctx);
+        self.egui_winit = Some(egui_winit);
         self.app = Some(app);
     }
 
@@ -136,7 +158,7 @@ impl ApplicationHandler for ProbeRuntime {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let Some(window) = self.window.as_ref() else {
+        let Some(window) = self.window.as_ref().cloned() else {
             return;
         };
         if window.id() != window_id {
@@ -145,59 +167,70 @@ impl ApplicationHandler for ProbeRuntime {
 
         match event {
             WindowEvent::CloseRequested | WindowEvent::Destroyed => event_loop.exit(),
-            WindowEvent::RedrawRequested => {
-                self.draw_first_frame();
-                event_loop.exit();
+            WindowEvent::RedrawRequested => self.draw_frame(event_loop),
+            event => {
+                let response = self
+                    .egui_winit
+                    .as_mut()
+                    .expect("egui-winit state missing")
+                    .on_window_event(&window, &event);
+                if response.repaint || matches!(event, WindowEvent::Resized(_)) {
+                    window.request_redraw();
+                }
             }
-            _ => {}
         }
     }
 }
 
 impl ProbeRuntime {
-    fn draw_first_frame(&mut self) {
-        let window = self.window.as_ref().expect("window missing");
+    fn draw_frame(&mut self, event_loop: &ActiveEventLoop) {
+        let window = self.window.as_ref().cloned().expect("window missing");
         let size = window.inner_size();
         let width = size.width.max(1);
         let height = size.height.max(1);
-        let pixels_per_point = window.scale_factor() as f32;
+
+        let raw_input = self
+            .egui_winit
+            .as_mut()
+            .expect("egui-winit state missing")
+            .take_egui_input(&window);
 
         let ctx = self.egui_ctx.as_ref().expect("egui context missing");
         let app = self.app.as_mut().expect("glyphflick app missing");
 
-        let mut raw_input = egui::RawInput {
-            screen_rect: Some(egui::Rect::from_min_size(
-                egui::Pos2::ZERO,
-                egui::vec2(
-                    width as f32 / pixels_per_point,
-                    height as f32 / pixels_per_point,
-                ),
-            )),
-            ..Default::default()
-        };
-        raw_input.viewport_id = egui::ViewportId::ROOT;
-        raw_input
-            .viewports
-            .entry(egui::ViewportId::ROOT)
-            .or_default()
-            .native_pixels_per_point = Some(pixels_per_point);
-
         let egui_start = Instant::now();
-        let mut output = ctx.run_ui(raw_input, |ui| app.ui(ui));
+        let egui::FullOutput {
+            platform_output,
+            mut textures_delta,
+            shapes,
+            pixels_per_point,
+            ..
+        } = ctx.run_ui(raw_input, |ui| app.ui(ui));
         eprintln!(
             "glyphflick software-ui timing egui_run_us={}",
             egui_start.elapsed().as_micros()
         );
 
+        self.egui_winit
+            .as_mut()
+            .expect("egui-winit state missing")
+            .handle_platform_output(&window, platform_output);
+
+        let followup_redraw = app.take_followup_redraw();
+        if app.exit_requested() {
+            event_loop.exit();
+            return;
+        }
+
         let tessellate_start = Instant::now();
-        let primitives = ctx.tessellate(output.shapes, output.pixels_per_point);
+        let primitives = ctx.tessellate(shapes, pixels_per_point);
         eprintln!(
             "glyphflick software-ui timing tessellate_us={}",
             tessellate_start.elapsed().as_micros()
         );
 
         let texture_start = Instant::now();
-        self.textures.apply(&mut output.textures_delta);
+        self.textures.apply(&mut textures_delta);
         eprintln!(
             "glyphflick software-ui timing texture_update_us={}",
             texture_start.elapsed().as_micros()
@@ -221,7 +254,7 @@ impl ProbeRuntime {
             &mut buffer,
             width as usize,
             height as usize,
-            output.pixels_per_point,
+            pixels_per_point,
             &primitives,
             &self.textures,
         );
@@ -238,13 +271,25 @@ impl ProbeRuntime {
             "glyphflick software-ui timing present_call_us={}",
             present_start.elapsed().as_micros()
         );
-        eprintln!(
-            "glyphflick software-ui timing startup_to_first_present_us={}",
-            self.process_start.elapsed().as_micros()
-        );
 
-        for id in output.textures_delta.free.drain() {
+        for id in textures_delta.free.drain() {
             self.textures.images.remove(&id);
+        }
+
+        if self.first_present {
+            self.first_present = false;
+            eprintln!(
+                "glyphflick software-ui timing startup_to_first_present_us={}",
+                self.process_start.elapsed().as_micros()
+            );
+            if self.exit_after_first_present {
+                event_loop.exit();
+                return;
+            }
+        }
+
+        if followup_redraw {
+            window.request_redraw();
         }
     }
 }
