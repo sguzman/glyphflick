@@ -282,3 +282,24 @@ The next measurement closes that gap. `glyphflick-software-ui-probe` is gated be
 The probe reports egui app initialization, egui run, tessellation, texture update, software rasterization, present-call, and process-to-first-present separately.
 
 This renderer is intentionally experimental. It is not production code and cannot displace OpenGL until target measurements show a material end-to-end win with the real UI. CI compiles/tests/clippy-checks the probe, while the normal runtime budget remains 6,181,056 bytes / 5.895 MiB and rejects forbidden production dependencies.
+
+
+### Real UI software result and production-shaped candidate
+
+The first real-egui software probe measured seven launches on the target EndeavourOS/Hyprland host:
+
+| Metric | Median |
+| --- | ---: |
+| Production OpenGL first completed swap | 54.677 ms |
+| Real egui + CPU + softbuffer first present | 24.517 ms |
+| Software egui run | 11.294 ms |
+| Software tessellation | 0.012 ms |
+| Software texture update | 0.437 ms |
+| Software rasterization | 9.407 ms |
+| Software present call | 0.016 ms |
+
+This cuts measured process-to-visible latency by 30.160 ms, about 55%, while rendering the actual Glyphflick UI and color-emoji/font atlas.
+
+The presentation architecture decision is therefore settled in favor of pursuing software presentation. The remaining work is no longer to prove that EGL is expensive; it is to turn the software path into a production-equivalent runtime and then optimize its two dominant buckets: first egui UI generation and CPU rasterization.
+
+The software probe has now been upgraded into that production-shaped candidate. It uses the pinned `egui-winit` integration already shipped through `egui_glow` for real Wayland keyboard/text/mouse input and platform output, keeps the picker open during normal execution, and preserves an environment-controlled one-frame exit only for automated latency measurement. The next target probe measures the cost of this real input/runtime bridge before production promotion.
