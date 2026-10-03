@@ -35,7 +35,6 @@ echo
 echo "[1/3] building measured binaries"
 cargo build --release --locked --features timing --bin glyphflick
 cargo build --release --locked --features timing,legacy-gl --bin glyphflick-gl-probe
-cargo build --release --locked --features softbuffer-probe --bin glyphflick-softbuffer-probe
 
 summarize_metric() {
   local log="$1"
@@ -117,6 +116,9 @@ run_production() {
     window_surface_init_us \
     egui_winit_init_us \
     egui_app_init_us \
+    app_ui_us \
+    ui_search_us \
+    ui_grid_us \
     egui_run_us \
     tessellate_us \
     texture_update_us \
@@ -136,45 +138,6 @@ run_production() {
 
   rm -f "$log"
 }
-
-run_softbuffer() {
-  local log
-  log="$(mktemp)"
-
-  echo
-  echo "[softbuffer] measuring $runs launches"
-
-  for ((run = 1; run <= runs; run++)); do
-    printf -- "--- run %d ---\n" "$run" >>"$log"
-    ./target/release/glyphflick-softbuffer-probe 2>>"$log"
-  done
-
-  for key in \
-    event_loop_init_us \
-    context_init_us \
-    startup_to_resumed_us \
-    window_create_us \
-    surface_create_us \
-    resize_us \
-    buffer_acquire_us \
-    buffer_fill_us \
-    present_call_us \
-    startup_to_first_present_us
-  do
-    summarize_metric "$log" softbuffer "$key"
-  done
-
-  {
-    echo
-    echo "Raw softbuffer log:"
-    cat "$log"
-    echo
-  } >>"$report"
-
-  rm -f "$log"
-}
-
-
 
 {
   echo "Glyphflick latency probe"
