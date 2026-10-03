@@ -14,6 +14,8 @@ pub struct Timing {
     process_start: Instant,
     #[cfg(feature = "timing")]
     exit_after_first_present: bool,
+    #[cfg(feature = "timing")]
+    fast_grid: bool,
     #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     exit_after_first_swap: bool,
     #[cfg(all(feature = "timing", feature = "legacy-gl"))]
@@ -33,6 +35,8 @@ impl Default for Timing {
             #[cfg(feature = "timing")]
             exit_after_first_present: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT")
                 .is_some(),
+            #[cfg(feature = "timing")]
+            fast_grid: std::env::var_os("GLYPHFLICK_FAST_GRID").is_some(),
             #[cfg(all(feature = "timing", feature = "legacy-gl"))]
             exit_after_first_swap: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_SWAP").is_some(),
             #[cfg(all(feature = "timing", feature = "legacy-gl"))]
@@ -181,6 +185,19 @@ impl Timing {
         }
 
         #[cfg(not(all(feature = "timing", feature = "legacy-gl")))]
+        {
+            false
+        }
+    }
+
+    #[inline(always)]
+    pub const fn fast_grid(self) -> bool {
+        #[cfg(feature = "timing")]
+        {
+            self.fast_grid
+        }
+
+        #[cfg(not(feature = "timing"))]
         {
             false
         }
