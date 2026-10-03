@@ -173,7 +173,9 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
 
         let mut picked = None;
 
+        let timing = self.timing;
         egui::CentralPanel::default().show(ui, |ui| {
+            let search_start = timing.stamp();
             let response = ui.add_sized(
                 [ui.available_width(), SEARCH_HEIGHT],
                 egui::TextEdit::singleline(&mut self.query)
@@ -202,9 +204,13 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
                 ui.colored_label(ui.visuals().error_fg_color, error);
             }
 
+            timing.report_ui_search(search_start);
+
             if defer_grid {
                 self.followup_redraw = true;
             } else {
+                let grid_start = timing.stamp();
+                let mut rendered_items = 0_usize;
                 let spacing = ui.spacing().item_spacing.x;
                 let columns = ((ui.available_width() + spacing) / (CELL_SIZE + spacing))
                     .floor()
@@ -232,6 +238,7 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
                                     break;
                                 };
                                 let glyph = self.corpus.get(index);
+                                rendered_items += 1;
 
                                 let response = ui
                                     .add_sized(
@@ -258,6 +265,8 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
                         ui.weak("No matching glyphs");
                     });
                 }
+
+                timing.report_ui_grid(grid_start, rendered_items);
             }
         });
 
