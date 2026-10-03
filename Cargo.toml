@@ -9,12 +9,11 @@ repository = "https://github.com/sguzman/glyphflick"
 [features]
 default = []
 timing = []
-softbuffer-probe = ["dep:softbuffer", "dep:egui-winit"]
+softbuffer-probe = ["dep:softbuffer"]
 
 [dependencies]
 egui = { git = "https://github.com/emilk/egui.git", rev = "f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9", default-features = false }
 egui_glow = { git = "https://github.com/emilk/egui.git", rev = "f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9", default-features = false, features = ["winit", "wayland"] }
-egui-winit = { git = "https://github.com/emilk/egui.git", rev = "f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9", default-features = false, features = ["wayland"], optional = true }
 emojis = "=0.9.0"
 epaint = { git = "https://github.com/emilk/egui.git", rev = "f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9", default-features = false, features = ["color_fonts"] }
 epaint_default_fonts = { git = "https://github.com/emilk/egui.git", rev = "f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9", default-features = false }
