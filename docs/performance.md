@@ -303,3 +303,30 @@ This cuts measured process-to-visible latency by 30.160 ms, about 55%, while ren
 The presentation architecture decision is therefore settled in favor of pursuing software presentation. The remaining work is no longer to prove that EGL is expensive; it is to turn the software path into a production-equivalent runtime and then optimize its two dominant buckets: first egui UI generation and CPU rasterization.
 
 The software probe has now been upgraded into that production-shaped candidate. It uses the pinned `egui-winit` integration already shipped through `egui_glow` for real Wayland keyboard/text/mouse input and platform output, keeps the picker open during normal execution, and preserves an environment-controlled one-frame exit only for automated latency measurement. The next target probe measures the cost of this real input/runtime bridge before production promotion.
+
+
+### Production software promotion and first raster fast path
+
+The production-shaped software candidate was promoted after a second seven-launch target-host run with real egui-winit input handling.
+
+At commit `c350d7d`, median values were:
+
+| Metric | Production software | Legacy OpenGL |
+| --- | ---: | ---: |
+| First useful presentation | 24.488 ms | 56.162 ms |
+| egui run | 11.864 ms | 12.510 ms |
+| Software raster / GL paint | 8.936 ms | 2.494 ms |
+| Present / swap call | 0.027 ms | 0.892 ms |
+
+The software runtime is 31.674 ms faster end-to-end at the median, a 56.4% reduction versus the retained legacy OpenGL comparison path. The default runtime dependency graph no longer contains EGL/glutin/egui_glow, and the stripped release is approximately 5.77 MiB.
+
+The first CPU raster optimization recognizes egui's canonical axis-aligned four-vertex/six-index rectangle topology and renders it with a rectangle loop instead of two generic barycentric triangles. On the target first frame it matched 93 quads while 70 triangles remained on the generic fallback. The raster median reached 8.936 ms. The fast path stays because it is conservative, covered by unit tests, and improves the measured hot path without changing UI semantics.
+
+The dominant remaining startup bucket is now the egui first-frame run at roughly 11-12 ms. The next timing pass separates:
+
+- time spent inside the Glyphflick app closure;
+- search-field/widget construction;
+- visible-grid/widget construction;
+- egui work performed after the app closure returns.
+
+That split determines whether the next optimization should simplify the widget tree or target egui/font-frame processing.
