@@ -162,15 +162,20 @@ impl Runtime {
         let ctx = self.egui_ctx.as_ref().expect("egui context missing");
         let app = self.app.as_mut().expect("glyphflick app missing");
 
-        let egui_start = self.timing.stamp();
+        let timing = self.timing;
+        let egui_start = timing.stamp();
         let egui::FullOutput {
             platform_output,
             mut textures_delta,
             shapes,
             pixels_per_point,
             ..
-        } = ctx.run_ui(raw_input, |ui| app.ui(ui));
-        self.timing.report_egui_run(egui_start);
+        } = ctx.run_ui(raw_input, |ui| {
+            let app_ui_start = timing.stamp();
+            app.ui(ui);
+            timing.report_app_ui(app_ui_start);
+        });
+        timing.report_egui_run(egui_start);
 
         self.egui_winit
             .as_mut()
