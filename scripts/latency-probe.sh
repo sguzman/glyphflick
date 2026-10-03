@@ -32,7 +32,7 @@ echo "git_commit=$(git rev-parse --short=12 HEAD)"
 echo "rustc=$(rustc --version)"
 echo
 
-echo "[1/3] building measured binaries"
+echo "[1/4] building measured binaries"
 cargo build --release --locked --features timing --bin glyphflick
 cargo build --release --locked --features timing,legacy-gl --bin glyphflick-gl-probe
 
@@ -138,6 +138,49 @@ run_production() {
 
   rm -f "$log"
 }
+run_fast_grid() {
+  local log
+  log="$(mktemp)"
+
+  echo
+  echo "[fast-grid] measuring $runs launches"
+
+  for ((run = 1; run <= runs; run++)); do
+    printf -- "--- run %d ---\n" "$run" >>"$log"
+    GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT=1 \
+      GLYPHFLICK_FAST_GRID=1 \
+      ./target/release/glyphflick 2>>"$log"
+  done
+
+  for key in \
+    event_loop_init_us \
+    context_init_us \
+    startup_to_resumed_us \
+    window_surface_init_us \
+    egui_winit_init_us \
+    egui_app_init_us \
+    app_ui_us \
+    ui_search_us \
+    ui_grid_us \
+    egui_run_us \
+    tessellate_us \
+    texture_update_us \
+    software_raster_us \
+    present_call_us \
+    startup_to_first_present_us
+  do
+    summarize_metric "$log" fast-grid "$key"
+  done
+
+  {
+    echo
+    echo "Raw fast-grid log:"
+    cat "$log"
+    echo
+  } >>"$report"
+
+  rm -f "$log"
+}
 
 {
   echo "Glyphflick latency probe"
@@ -148,11 +191,15 @@ run_production() {
   echo
 } >>"$report"
 
-echo "[2/3] production software runtime"
+echo "[2/4] production software baseline"
 run_production
 
 echo
-echo "[3/3] legacy OpenGL comparison"
+echo "[3/4] fast-grid software candidate"
+run_fast_grid
+
+echo
+echo "[4/4] legacy OpenGL comparison"
 run_legacy_gl
 
 echo
