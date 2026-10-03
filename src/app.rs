@@ -20,8 +20,6 @@ pub struct GlyphflickApp<B> {
     error: Option<String>,
     focus_search: bool,
     first_ui: bool,
-    defer_grid_once: bool,
-    followup_redraw: bool,
     exit_requested: bool,
     columns: usize,
     visible_rows: Range<usize>,
@@ -59,8 +57,6 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
             error: None,
             focus_search: true,
             first_ui: true,
-            defer_grid_once: timing.defer_grid(),
-            followup_redraw: false,
             exit_requested: false,
             columns: 1,
             visible_rows: 0..0,
@@ -74,13 +70,6 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
     #[inline]
     pub const fn exit_requested(&self) -> bool {
         self.exit_requested
-    }
-
-    #[inline]
-    pub fn take_followup_redraw(&mut self) -> bool {
-        let requested = self.followup_redraw;
-        self.followup_redraw = false;
-        requested
     }
 
     fn refresh_results(&mut self) {
@@ -159,11 +148,6 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
             self.first_ui = false;
             self.timing.mark_first_ui();
         }
-        let defer_grid = is_first_ui && self.defer_grid_once;
-        if defer_grid {
-            self.defer_grid_once = false;
-        }
-
         if ui.input(|input| input.key_pressed(egui::Key::Escape)) {
             self.exit_requested = true;
             return;
@@ -206,11 +190,8 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
 
             timing.report_ui_search(search_start);
 
-            if defer_grid {
-                self.followup_redraw = true;
-            } else {
-                let grid_start = timing.stamp();
-                let mut rendered_items = 0_usize;
+            let grid_start = timing.stamp();
+            let mut rendered_items = 0_usize;
                 let spacing = ui.spacing().item_spacing.x;
                 let columns = ((ui.available_width() + spacing) / (CELL_SIZE + spacing))
                     .floor()
@@ -241,25 +222,14 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
                                 rendered_items += 1;
 
                                 let selected = active == Some(position);
-                                let response = if self.timing.fast_grid() {
-                                    fast_glyph_cell(
-                                        ui,
-                                        selected,
-                                        glyph.text(),
-                                        glyph.name(),
-                                        &self.emoji_font,
-                                    )
-                                } else {
-                                    ui.add_sized(
-                                        [CELL_SIZE, CELL_SIZE],
-                                        egui::Button::selectable(
-                                            selected,
-                                            egui::RichText::new(glyph.text())
-                                                .font(self.emoji_font.clone()),
-                                        ),
-                                    )
-                                    .on_hover_text(glyph.name())
-                                };
+                                let response = glyph_cell(
+                                    ui,
+                                    selected,
+                                    glyph.text(),
+                                    glyph.name(),
+                                    &self.emoji_font,
+                                    !self.timing.suppress_grid_text(),
+                                );
 
                                 if response.clicked() {
                                     picked = Some(glyph.text());
@@ -276,8 +246,7 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
                     });
                 }
 
-                timing.report_ui_grid(grid_start, rendered_items);
-            }
+            timing.report_ui_grid(grid_start, rendered_items);
         });
 
         if picked.is_none() && ui.input(|input| input.key_pressed(egui::Key::Enter)) {
@@ -294,12 +263,13 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
     }
 }
 
-fn fast_glyph_cell(
+fn glyph_cell(
     ui: &mut egui::Ui,
     selected: bool,
     text: &str,
     name: &str,
     font: &egui::FontId,
+    paint_text: bool,
 ) -> egui::Response {
     let (rect, response) =
         ui.allocate_exact_size(egui::Vec2::splat(CELL_SIZE), egui::Sense::click());
@@ -322,13 +292,15 @@ fn fast_glyph_cell(
             );
         }
 
-        ui.painter().text(
-            rect.center(),
-            egui::Align2::CENTER_CENTER,
-            text,
-            font.clone(),
-            visuals.text_color(),
-        );
+        if paint_text {
+            ui.painter().text(
+                rect.center(),
+                egui::Align2::CENTER_CENTER,
+                text,
+                font.clone(),
+                visuals.text_color(),
+            );
+        }
     }
 
     response.on_hover_text(name)

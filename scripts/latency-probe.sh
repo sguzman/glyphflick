@@ -32,9 +32,8 @@ echo "git_commit=$(git rev-parse --short=12 HEAD)"
 echo "rustc=$(rustc --version)"
 echo
 
-echo "[1/4] building measured binaries"
+echo "[1/3] building measured binary"
 cargo build --release --locked --features timing --bin glyphflick
-cargo build --release --locked --features timing,legacy-gl --bin glyphflick-gl-probe
 
 summarize_metric() {
   local log="$1"
@@ -59,54 +58,29 @@ summarize_metric() {
   p95="$(sort -n <<<"$values" | awk '{ a[NR]=$1 } END { i=int((95 * NR + 99) / 100); if (i < 1) i=1; if (i > NR) i=NR; print a[i] }')"
   avg="$(awk '{ sum += $1 } END { printf "%.0f", sum / NR }' <<<"$values")"
 
-  printf '%-12s %-38s first=%8sus  min=%8sus  p50=%8sus  avg=%8sus  p95=%8sus  max=%8sus\n' \
+  printf '%-13s %-38s first=%8sus  min=%8sus  p50=%8sus  avg=%8sus  p95=%8sus  max=%8sus\n' \
     "$label" "$key" "$first" "$min" "$median" "$avg" "$p95" "$max" | tee -a "$report"
 }
 
-run_legacy_gl() {
+run_mode() {
+  local label="$1"
+  local suppress_text="$2"
   local log
   log="$(mktemp)"
 
   echo
-  echo "[legacy-gl] measuring $runs launches"
+  echo "[$label] measuring $runs launches"
 
   for ((run = 1; run <= runs; run++)); do
     printf -- "--- run %d ---\n" "$run" >>"$log"
-    GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 \
-      ./target/release/glyphflick-gl-probe 2>>"$log"
-  done
-
-  for key in \
-    startup_to_first_ui_us \
-    first_egui_run_us \
-    first_gl_paint_us \
-    first_swap_call_us \
-    startup_to_first_swap_complete_us
-  do
-    summarize_metric "$log" legacy-gl "$key"
-  done
-
-  {
-    echo
-    echo "Raw legacy-gl log:"
-    cat "$log"
-    echo
-  } >>"$report"
-
-  rm -f "$log"
-}
-
-run_production() {
-  local log
-  log="$(mktemp)"
-
-  echo
-  echo "[production] measuring $runs launches"
-
-  for ((run = 1; run <= runs; run++)); do
-    printf -- "--- run %d ---\n" "$run" >>"$log"
-    GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT=1 \
-      ./target/release/glyphflick 2>>"$log"
+    if [[ "$suppress_text" == "1" ]]; then
+      GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT=1 \
+        GLYPHFLICK_SUPPRESS_GRID_TEXT=1 \
+        ./target/release/glyphflick 2>>"$log"
+    else
+      GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT=1 \
+        ./target/release/glyphflick 2>>"$log"
+    fi
   done
 
   for key in \
@@ -123,58 +97,17 @@ run_production() {
     tessellate_us \
     texture_update_us \
     software_raster_us \
+    raster_fast_quads \
+    raster_fallback_triangles \
     present_call_us \
     startup_to_first_present_us
   do
-    summarize_metric "$log" production "$key"
+    summarize_metric "$log" "$label" "$key"
   done
 
   {
     echo
-    echo "Raw production log:"
-    cat "$log"
-    echo
-  } >>"$report"
-
-  rm -f "$log"
-}
-run_fast_grid() {
-  local log
-  log="$(mktemp)"
-
-  echo
-  echo "[fast-grid] measuring $runs launches"
-
-  for ((run = 1; run <= runs; run++)); do
-    printf -- "--- run %d ---\n" "$run" >>"$log"
-    GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT=1 \
-      GLYPHFLICK_FAST_GRID=1 \
-      ./target/release/glyphflick 2>>"$log"
-  done
-
-  for key in \
-    event_loop_init_us \
-    context_init_us \
-    startup_to_resumed_us \
-    window_surface_init_us \
-    egui_winit_init_us \
-    egui_app_init_us \
-    app_ui_us \
-    ui_search_us \
-    ui_grid_us \
-    egui_run_us \
-    tessellate_us \
-    texture_update_us \
-    software_raster_us \
-    present_call_us \
-    startup_to_first_present_us
-  do
-    summarize_metric "$log" fast-grid "$key"
-  done
-
-  {
-    echo
-    echo "Raw fast-grid log:"
+    echo "Raw $label log:"
     cat "$log"
     echo
   } >>"$report"
@@ -191,16 +124,12 @@ run_fast_grid() {
   echo
 } >>"$report"
 
-echo "[2/4] production software baseline"
-run_production
+echo "[2/3] production software runtime"
+run_mode production 0
 
 echo
-echo "[3/4] fast-grid software candidate"
-run_fast_grid
-
-echo
-echo "[4/4] legacy OpenGL comparison"
-run_legacy_gl
+echo "[3/3] no-grid-text diagnostic"
+run_mode no-grid-text 1
 
 echo
 echo "probe_report=$report"

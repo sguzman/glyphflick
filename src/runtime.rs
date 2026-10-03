@@ -182,7 +182,6 @@ impl Runtime {
             .expect("egui-winit state missing")
             .handle_platform_output(&window, platform_output);
 
-        let followup_redraw = app.take_followup_redraw();
         if app.exit_requested() {
             event_loop.exit();
             return;
@@ -243,9 +242,6 @@ impl Runtime {
             }
         }
 
-        if followup_redraw {
-            window.request_redraw();
-        }
     }
 }
 
