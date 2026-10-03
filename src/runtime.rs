@@ -214,10 +214,8 @@ impl Runtime {
             &self.textures,
         );
         self.timing.report_software_raster(raster_start);
-        self.timing.report_raster_mix(
-            raster_stats.fast_quads,
-            raster_stats.fallback_triangles,
-        );
+        self.timing
+            .report_raster_mix(raster_stats.fast_quads, raster_stats.fallback_triangles);
 
         let present_start = self.timing.stamp();
         buffer
@@ -326,14 +324,7 @@ fn rasterize(
             if cursor + 6 <= mesh.indices.len() {
                 let indices = &mesh.indices[cursor..cursor + 6];
                 if let Some(vertices) = canonical_quad(mesh, indices) {
-                    raster_quad(
-                        target,
-                        width,
-                        clip,
-                        pixels_per_point,
-                        texture,
-                        vertices,
-                    );
+                    raster_quad(target, width, clip, pixels_per_point, texture, vertices);
                     stats.fast_quads += 1;
                     cursor += 6;
                     continue;
@@ -353,10 +344,7 @@ fn rasterize(
     stats
 }
 
-fn canonical_quad(
-    mesh: &egui::Mesh,
-    indices: &[u32],
-) -> Option<[egui::epaint::Vertex; 4]> {
+fn canonical_quad(mesh: &egui::Mesh, indices: &[u32]) -> Option<[egui::epaint::Vertex; 4]> {
     let [i0, i1, i2, j2, j1, i3] = *indices else {
         return None;
     };
@@ -378,10 +366,8 @@ fn canonical_quad(
         && b.pos.x == d.pos.x
         && a.pos.x < b.pos.x
         && a.pos.y < c.pos.y;
-    let rectangular_uvs = a.uv.y == b.uv.y
-        && c.uv.y == d.uv.y
-        && a.uv.x == c.uv.x
-        && b.uv.x == d.uv.x;
+    let rectangular_uvs =
+        a.uv.y == b.uv.y && c.uv.y == d.uv.y && a.uv.x == c.uv.x && b.uv.x == d.uv.x;
     let uniform_color = a.color == b.color && a.color == c.color && a.color == d.color;
 
     (rectangular_positions && rectangular_uvs && uniform_color).then_some(vertices)
@@ -572,7 +558,6 @@ fn blend_over_rgb(dst: u32, src: [u8; 4]) -> u32 {
 
     (out_r << 16) | (out_g << 8) | out_b
 }
-
 
 #[cfg(test)]
 mod tests {
