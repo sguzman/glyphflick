@@ -31,7 +31,8 @@ impl Default for Timing {
             #[cfg(feature = "timing")]
             process_start: Instant::now(),
             #[cfg(feature = "timing")]
-            exit_after_first_present: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT").is_some(),
+            exit_after_first_present: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT")
+                .is_some(),
             #[cfg(all(feature = "timing", feature = "legacy-gl"))]
             exit_after_first_swap: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_SWAP").is_some(),
             #[cfg(all(feature = "timing", feature = "legacy-gl"))]
@@ -365,7 +366,10 @@ impl Timing {
     #[inline(always)]
     pub fn report_context_init(self, start: Stamp) {
         #[cfg(feature = "timing")]
-        eprintln!("glyphflick timing context_init_us={}", start.elapsed().as_micros());
+        eprintln!(
+            "glyphflick timing context_init_us={}",
+            start.elapsed().as_micros()
+        );
 
         #[cfg(not(feature = "timing"))]
         let _ = (self, start);
@@ -410,7 +414,10 @@ impl Timing {
     #[inline(always)]
     pub fn report_egui_run(self, start: Stamp) {
         #[cfg(feature = "timing")]
-        eprintln!("glyphflick timing egui_run_us={}", start.elapsed().as_micros());
+        eprintln!(
+            "glyphflick timing egui_run_us={}",
+            start.elapsed().as_micros()
+        );
 
         #[cfg(not(feature = "timing"))]
         let _ = (self, start);
