@@ -305,12 +305,7 @@ fn fast_glyph_cell(
         ui.allocate_exact_size(egui::Vec2::splat(CELL_SIZE), egui::Sense::click());
 
     response.widget_info(|| {
-        egui::WidgetInfo::selected(
-            egui::WidgetType::Button,
-            ui.is_enabled(),
-            selected,
-            text,
-        )
+        egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), selected, text)
     });
 
     if ui.is_rect_visible(rect) {
