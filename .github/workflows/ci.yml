@@ -37,7 +37,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             fonts-noto-color-emoji \
-            libegl1-mesa-dev \
             libwayland-dev \
             libxkbcommon-dev \
             pkg-config
