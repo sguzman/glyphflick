@@ -229,7 +229,9 @@ impl ProbeRuntime {
         );
 
         let present_start = Instant::now();
-        buffer.present().expect("failed to present software UI frame");
+        buffer
+            .present()
+            .expect("failed to present software UI frame");
         eprintln!(
             "glyphflick software-ui timing present_call_us={}",
             present_start.elapsed().as_micros()
@@ -316,16 +318,7 @@ fn rasterize(
             let a = mesh.vertices[triangle[0] as usize];
             let b = mesh.vertices[triangle[1] as usize];
             let c = mesh.vertices[triangle[2] as usize];
-            raster_triangle(
-                target,
-                width,
-                clip,
-                pixels_per_point,
-                texture,
-                a,
-                b,
-                c,
-            );
+            raster_triangle(target, width, clip, pixels_per_point, texture, a, b, c);
         }
     }
 }
@@ -368,22 +361,10 @@ fn raster_triangle(
         return;
     }
 
-    let min_x = p0[0]
-        .min(p1[0])
-        .min(p2[0])
-        .floor() as i32;
-    let min_y = p0[1]
-        .min(p1[1])
-        .min(p2[1])
-        .floor() as i32;
-    let max_x = p0[0]
-        .max(p1[0])
-        .max(p2[0])
-        .ceil() as i32;
-    let max_y = p0[1]
-        .max(p1[1])
-        .max(p2[1])
-        .ceil() as i32;
+    let min_x = p0[0].min(p1[0]).min(p2[0]).floor() as i32;
+    let min_y = p0[1].min(p1[1]).min(p2[1]).floor() as i32;
+    let max_x = p0[0].max(p1[0]).max(p2[0]).ceil() as i32;
+    let max_y = p0[1].max(p1[1]).max(p2[1]).ceil() as i32;
 
     let min_x = min_x.max(clip.0);
     let min_y = min_y.max(clip.1);
