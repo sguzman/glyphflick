@@ -32,10 +32,10 @@ echo "git_commit=$(git rev-parse --short=12 HEAD)"
 echo "rustc=$(rustc --version)"
 echo
 
-echo "[1/5] building measured binaries"
+echo "[1/3] building measured binaries"
 cargo build --release --locked --features timing --bin glyphflick
+cargo build --release --locked --features timing,legacy-gl --bin glyphflick-gl-probe
 cargo build --release --locked --features softbuffer-probe --bin glyphflick-softbuffer-probe
-cargo build --release --locked --features softbuffer-probe --bin glyphflick-software-ui-probe
 
 summarize_metric() {
   local log="$1"
@@ -64,24 +64,17 @@ summarize_metric() {
     "$label" "$key" "$first" "$min" "$median" "$avg" "$p95" "$max" | tee -a "$report"
 }
 
-run_gl_mode() {
-  local label="$1"
-  local deferred="$2"
+run_legacy_gl() {
   local log
   log="$(mktemp)"
 
   echo
-  echo "[$label] measuring $runs launches"
+  echo "[legacy-gl] measuring $runs launches"
 
   for ((run = 1; run <= runs; run++)); do
     printf -- "--- run %d ---\n" "$run" >>"$log"
-    if [[ "$deferred" == true ]]; then
-      GLYPHFLICK_DEFER_GRID=1 GLYPHFLICK_EXIT_AFTER_SECOND_SWAP=1 \
-        ./target/release/glyphflick 2>>"$log"
-    else
-      GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 \
-        ./target/release/glyphflick 2>>"$log"
-    fi
+    GLYPHFLICK_EXIT_AFTER_FIRST_SWAP=1 \
+      ./target/release/glyphflick-gl-probe 2>>"$log"
   done
 
   for key in \
@@ -91,23 +84,52 @@ run_gl_mode() {
     first_swap_call_us \
     startup_to_first_swap_complete_us
   do
-    summarize_metric "$log" "$label" "$key"
+    summarize_metric "$log" legacy-gl "$key"
   done
-
-  if [[ "$deferred" == true ]]; then
-    for key in \
-      second_egui_run_us \
-      second_gl_paint_us \
-      second_swap_call_us \
-      startup_to_second_swap_complete_us
-    do
-      summarize_metric "$log" "$label" "$key"
-    done
-  fi
 
   {
     echo
-    echo "Raw $label log:"
+    echo "Raw legacy-gl log:"
+    cat "$log"
+    echo
+  } >>"$report"
+
+  rm -f "$log"
+}
+
+run_production() {
+  local log
+  log="$(mktemp)"
+
+  echo
+  echo "[production] measuring $runs launches"
+
+  for ((run = 1; run <= runs; run++)); do
+    printf -- "--- run %d ---\n" "$run" >>"$log"
+    GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT=1 \
+      ./target/release/glyphflick 2>>"$log"
+  done
+
+  for key in \
+    event_loop_init_us \
+    context_init_us \
+    startup_to_resumed_us \
+    window_surface_init_us \
+    egui_winit_init_us \
+    egui_app_init_us \
+    egui_run_us \
+    tessellate_us \
+    texture_update_us \
+    software_raster_us \
+    present_call_us \
+    startup_to_first_present_us
+  do
+    summarize_metric "$log" production "$key"
+  done
+
+  {
+    echo
+    echo "Raw production log:"
     cat "$log"
     echo
   } >>"$report"
@@ -153,45 +175,6 @@ run_softbuffer() {
 }
 
 
-run_software_ui() {
-  local log
-  log="$(mktemp)"
-
-  echo
-  echo "[software-ui] measuring $runs launches"
-
-  for ((run = 1; run <= runs; run++)); do
-    printf -- "--- run %d ---\n" "$run" >>"$log"
-    GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT=1 \
-      ./target/release/glyphflick-software-ui-probe 2>>"$log"
-  done
-
-  for key in \
-    event_loop_init_us \
-    context_init_us \
-    startup_to_resumed_us \
-    window_surface_init_us \
-    egui_winit_init_us \
-    egui_app_init_us \
-    egui_run_us \
-    tessellate_us \
-    texture_update_us \
-    software_raster_us \
-    present_call_us \
-    startup_to_first_present_us
-  do
-    summarize_metric "$log" software-ui "$key"
-  done
-
-  {
-    echo
-    echo "Raw software-ui log:"
-    cat "$log"
-    echo
-  } >>"$report"
-
-  rm -f "$log"
-}
 
 {
   echo "Glyphflick latency probe"
@@ -202,20 +185,12 @@ run_software_ui() {
   echo
 } >>"$report"
 
-echo "[2/5] production frame"
-run_gl_mode production false
+echo "[2/3] production software runtime"
+run_production
 
 echo
-echo "[3/5] deferred-grid two-frame experiment"
-run_gl_mode deferred true
-
-echo
-echo "[4/5] flat software presenter"
-run_softbuffer
-
-echo
-echo "[5/5] real egui software presenter"
-run_software_ui
+echo "[3/3] legacy OpenGL comparison"
+run_legacy_gl
 
 echo
 echo "probe_report=$report"

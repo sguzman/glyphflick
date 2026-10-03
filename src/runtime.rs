@@ -1,18 +1,15 @@
-use core::num::NonZeroU32;
-use std::ffi::CString;
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::num::NonZeroU32;
+use std::rc::Rc;
 
-use glutin::config::GlConfig as _;
-use glutin::context::{GlContext as _, NotCurrentGlContext as _};
-use glutin::display::{GetGlDisplay as _, GlDisplay as _};
-use glutin::prelude::GlSurface as _;
+use egui::epaint::Primitive;
+use softbuffer::{Context, Surface};
 use winit::application::ApplicationHandler;
-use winit::dpi::{LogicalSize, PhysicalSize};
+use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, OwnedDisplayHandle};
 use winit::platform::wayland::WindowAttributesExtWayland as _;
-use winit::raw_window_handle::HasWindowHandle as _;
-use winit::window::{Window, WindowAttributes, WindowId};
+use winit::window::{Window, WindowId};
 
 use crate::app::GlyphflickApp;
 use crate::clipboard::WlCopyClipboard;
@@ -20,66 +17,101 @@ use crate::perf::Timing;
 
 const WINDOW_WIDTH: f64 = 560.0;
 const WINDOW_HEIGHT: f64 = 440.0;
-const CLEAR_COLOR: [f32; 4] = [0.03, 0.03, 0.03, 1.0];
+const CLEAR_PIXEL: u32 = 0x0008_0808;
 
 pub fn run(timing: Timing) -> Result<(), winit::error::EventLoopError> {
     let event_loop_start = timing.stamp();
     let event_loop = EventLoop::new()?;
     timing.report_event_loop_init(event_loop_start);
 
-    let mut runtime = Runtime::new(timing);
+    let context_start = timing.stamp();
+    let context = Context::new(event_loop.owned_display_handle())
+        .expect("failed to create softbuffer Wayland context");
+    timing.report_context_init(context_start);
+
+    let mut runtime = Runtime::new(timing, context);
     event_loop.run_app(&mut runtime)
 }
 
 struct Runtime {
     timing: Timing,
-    #[cfg(feature = "timing")]
-    first_swap_pending: bool,
-    #[cfg(feature = "timing")]
-    second_swap_pending: bool,
-    gl_window: Option<GlutinWindowContext>,
-    egui_glow: Option<egui_glow::EguiGlow>,
+    context: Context<OwnedDisplayHandle>,
+    window: Option<Rc<Window>>,
+    surface: Option<Surface<OwnedDisplayHandle, Rc<Window>>>,
+    egui_ctx: Option<egui::Context>,
+    egui_winit: Option<egui_winit::State>,
     app: Option<GlyphflickApp<WlCopyClipboard>>,
+    textures: TextureStore,
+    first_present: bool,
 }
 
 impl Runtime {
-    const fn new(timing: Timing) -> Self {
+    fn new(timing: Timing, context: Context<OwnedDisplayHandle>) -> Self {
         Self {
             timing,
-            #[cfg(feature = "timing")]
-            first_swap_pending: true,
-            #[cfg(feature = "timing")]
-            second_swap_pending: true,
-            gl_window: None,
-            egui_glow: None,
+            context,
+            window: None,
+            surface: None,
+            egui_ctx: None,
+            egui_winit: None,
             app: None,
+            textures: TextureStore::default(),
+            first_present: true,
         }
     }
 }
 
 impl ApplicationHandler for Runtime {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.gl_window.is_some() {
+        if self.window.is_some() {
             return;
         }
 
         event_loop.set_control_flow(ControlFlow::Wait);
         self.timing.mark_resumed();
 
-        let runtime_start = self.timing.stamp();
-        let (gl_window, gl) = create_display(event_loop, self.timing);
-        self.timing.report_runtime_init(runtime_start);
+        let surface_start = self.timing.stamp();
+        let size = LogicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT);
+        let window = Rc::new(
+            event_loop
+                .create_window(
+                    Window::default_attributes()
+                        .with_title("Glyphflick")
+                        .with_inner_size(size)
+                        .with_min_inner_size(size)
+                        .with_max_inner_size(size)
+                        .with_resizable(false)
+                        .with_decorations(false)
+                        .with_name("glyphflick", "glyphflick"),
+                )
+                .expect("failed to create Glyphflick Wayland window"),
+        );
+        let surface = Surface::new(&self.context, Rc::clone(&window))
+            .expect("failed to create Glyphflick software surface");
+        self.timing.report_window_surface_init(surface_start);
 
-        let egui_start = self.timing.stamp();
-        let egui_glow = egui_glow::EguiGlow::new(event_loop, Arc::new(gl), None, None, false);
-        self.timing.report_egui_init(egui_start);
+        let ctx = egui::Context::default();
 
-        let app = GlyphflickApp::new(&egui_glow.egui_ctx, WlCopyClipboard, self.timing);
+        let egui_winit_start = self.timing.stamp();
+        let egui_winit = egui_winit::State::new(
+            ctx.clone(),
+            egui::ViewportId::ROOT,
+            event_loop,
+            None,
+            event_loop.system_theme(),
+            None,
+        );
+        self.timing.report_egui_winit_init(egui_winit_start);
 
-        gl_window.window().request_redraw();
+        let app_start = self.timing.stamp();
+        let app = GlyphflickApp::new(&ctx, WlCopyClipboard, self.timing);
+        self.timing.report_egui_app_init(app_start);
 
-        self.gl_window = Some(gl_window);
-        self.egui_glow = Some(egui_glow);
+        window.request_redraw();
+        self.window = Some(window);
+        self.surface = Some(surface);
+        self.egui_ctx = Some(ctx);
+        self.egui_winit = Some(egui_winit);
         self.app = Some(app);
     }
 
@@ -89,306 +121,330 @@ impl ApplicationHandler for Runtime {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let Some(gl_window) = self.gl_window.as_mut() else {
+        let Some(window) = self.window.as_ref().cloned() else {
             return;
         };
-
-        if window_id != gl_window.window().id() {
+        if window.id() != window_id {
             return;
         }
 
-        if matches!(&event, WindowEvent::CloseRequested | WindowEvent::Destroyed) {
+        match event {
+            WindowEvent::CloseRequested | WindowEvent::Destroyed => event_loop.exit(),
+            WindowEvent::RedrawRequested => self.draw_frame(event_loop),
+            event => {
+                let response = self
+                    .egui_winit
+                    .as_mut()
+                    .expect("egui-winit state missing")
+                    .on_window_event(&window, &event);
+
+                if response.repaint || matches!(event, WindowEvent::Resized(_)) {
+                    window.request_redraw();
+                }
+            }
+        }
+    }
+}
+
+impl Runtime {
+    fn draw_frame(&mut self, event_loop: &ActiveEventLoop) {
+        let window = self.window.as_ref().cloned().expect("window missing");
+        let size = window.inner_size();
+        let width = size.width.max(1);
+        let height = size.height.max(1);
+
+        let raw_input = self
+            .egui_winit
+            .as_mut()
+            .expect("egui-winit state missing")
+            .take_egui_input(&window);
+
+        let ctx = self.egui_ctx.as_ref().expect("egui context missing");
+        let app = self.app.as_mut().expect("glyphflick app missing");
+
+        let egui_start = self.timing.stamp();
+        let egui::FullOutput {
+            platform_output,
+            mut textures_delta,
+            shapes,
+            pixels_per_point,
+            ..
+        } = ctx.run_ui(raw_input, |ui| app.ui(ui));
+        self.timing.report_egui_run(egui_start);
+
+        self.egui_winit
+            .as_mut()
+            .expect("egui-winit state missing")
+            .handle_platform_output(&window, platform_output);
+
+        let followup_redraw = app.take_followup_redraw();
+        if app.exit_requested() {
             event_loop.exit();
             return;
         }
 
-        if matches!(&event, WindowEvent::RedrawRequested) {
-            let egui_glow = self.egui_glow.as_mut().expect("egui runtime missing");
-            let app = self.app.as_mut().expect("glyphflick app missing");
+        let tessellate_start = self.timing.stamp();
+        let primitives = ctx.tessellate(shapes, pixels_per_point);
+        self.timing.report_tessellate(tessellate_start);
 
-            #[cfg(feature = "timing")]
-            let first_egui_start = self.first_swap_pending.then(|| self.timing.stamp());
-            #[cfg(feature = "timing")]
-            let second_egui_start =
-                (!self.first_swap_pending && self.second_swap_pending).then(|| self.timing.stamp());
+        let texture_start = self.timing.stamp();
+        self.textures.apply(&mut textures_delta);
+        self.timing.report_texture_update(texture_start);
 
-            egui_glow.run(gl_window.window(), |ui| app.ui(ui));
+        let surface = self.surface.as_mut().expect("surface missing");
+        surface
+            .resize(
+                NonZeroU32::new(width).expect("nonzero width"),
+                NonZeroU32::new(height).expect("nonzero height"),
+            )
+            .expect("failed to resize Glyphflick software surface");
 
-            #[cfg(feature = "timing")]
-            if let Some(start) = first_egui_start {
-                self.timing.report_first_egui_run(start);
-            }
-            #[cfg(feature = "timing")]
-            if let Some(start) = second_egui_start {
-                self.timing.report_second_egui_run(start);
-            }
+        let mut buffer = surface
+            .buffer_mut()
+            .expect("failed to acquire Glyphflick software back buffer");
+        buffer.fill(CLEAR_PIXEL);
 
-            let followup_redraw = app.take_followup_redraw();
-
-            if app.exit_requested() {
-                event_loop.exit();
-                return;
-            }
-
-            #[cfg(feature = "timing")]
-            let first_paint_start = self.first_swap_pending.then(|| self.timing.stamp());
-            #[cfg(feature = "timing")]
-            let second_paint_start =
-                (!self.first_swap_pending && self.second_swap_pending).then(|| self.timing.stamp());
-
-            let screen_size: [u32; 2] = gl_window.window().inner_size().into();
-            egui_glow.painter.clear(screen_size, CLEAR_COLOR);
-            egui_glow.paint(gl_window.window());
-
-            #[cfg(feature = "timing")]
-            if let Some(start) = first_paint_start {
-                self.timing.report_first_gl_paint(start);
-            }
-            #[cfg(feature = "timing")]
-            if let Some(start) = second_paint_start {
-                self.timing.report_second_gl_paint(start);
-            }
-
-            #[cfg(feature = "timing")]
-            let first_swap_start = self.first_swap_pending.then(|| self.timing.stamp());
-            #[cfg(feature = "timing")]
-            let second_swap_start =
-                (!self.first_swap_pending && self.second_swap_pending).then(|| self.timing.stamp());
-
-            if let Err(error) = gl_window.swap_buffers() {
-                eprintln!("glyphflick: buffer swap failed: {error}");
-                event_loop.exit();
-                return;
-            }
-
-            #[cfg(feature = "timing")]
-            if self.first_swap_pending {
-                if let Some(start) = first_swap_start {
-                    self.timing.report_first_swap_call(start);
-                }
-                self.first_swap_pending = false;
-                self.timing.mark_first_swap();
-                if self.timing.exit_after_first_swap() {
-                    event_loop.exit();
-                    return;
-                }
-            } else if self.second_swap_pending {
-                if let Some(start) = second_swap_start {
-                    self.timing.report_second_swap_call(start);
-                }
-                self.second_swap_pending = false;
-                self.timing.mark_second_swap();
-                if self.timing.exit_after_second_swap() {
-                    event_loop.exit();
-                    return;
-                }
-            }
-
-            if followup_redraw {
-                gl_window.window().request_redraw();
-            }
-            return;
-        }
-
-        if let WindowEvent::Resized(physical_size) = &event {
-            gl_window.resize(*physical_size);
-        }
-
-        let response = self
-            .egui_glow
-            .as_mut()
-            .expect("egui runtime missing")
-            .on_window_event(gl_window.window(), &event);
-
-        if response.repaint {
-            gl_window.window().request_redraw();
-        }
-    }
-
-    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-        if let Some(egui_glow) = self.egui_glow.as_mut() {
-            egui_glow.destroy();
-        }
-    }
-}
-
-struct GlutinWindowContext {
-    window: Window,
-    gl_context: glutin::context::PossiblyCurrentContext,
-    _gl_display: glutin::display::Display,
-    gl_surface: glutin::surface::Surface<glutin::surface::WindowSurface>,
-}
-
-impl GlutinWindowContext {
-    fn new(event_loop: &ActiveEventLoop, timing: Timing) -> Self {
-        let window_attributes = window_attributes();
-
-        let config_template = glutin::config::ConfigTemplateBuilder::new()
-            .prefer_hardware_accelerated(Some(true))
-            .with_alpha_size(0)
-            .with_depth_size(0)
-            .with_stencil_size(0)
-            .with_transparency(false);
-
-        let display_start = timing.stamp();
-        let (mut window, gl_config) = glutin_winit::DisplayBuilder::new()
-            .with_preference(glutin_winit::ApiPreference::PreferEgl)
-            .with_window_attributes(Some(window_attributes.clone()))
-            .build(event_loop, config_template, |mut configs| {
-                configs
-                    .next()
-                    .expect("no EGL configuration available for Glyphflick")
-            })
-            .expect("failed to create EGL configuration");
-        timing.report_display_build(display_start);
-        timing.report_gl_config(
-            gl_config.alpha_size(),
-            gl_config.depth_size(),
-            gl_config.stencil_size(),
-            gl_config.num_samples(),
-            gl_config.hardware_accelerated(),
-            gl_config.api(),
+        let raster_start = self.timing.stamp();
+        rasterize(
+            &mut buffer,
+            width as usize,
+            height as usize,
+            pixels_per_point,
+            &primitives,
+            &self.textures,
         );
+        self.timing.report_software_raster(raster_start);
 
-        let gl_display = gl_config.display();
+        let present_start = self.timing.stamp();
+        buffer
+            .present()
+            .expect("failed to present Glyphflick software frame");
+        self.timing.report_present_call(present_start);
 
-        let raw_window_handle = window.as_ref().map(|window| {
-            window
-                .window_handle()
-                .expect("failed to get Wayland window handle")
-                .as_raw()
-        });
+        for id in textures_delta.free.drain() {
+            self.textures.images.remove(&id);
+        }
 
-        let context_attributes = if timing.force_gles() {
-            glutin::context::ContextAttributesBuilder::new()
-                .with_context_api(glutin::context::ContextApi::Gles(None))
-                .build(raw_window_handle)
-        } else {
-            glutin::context::ContextAttributesBuilder::new().build(raw_window_handle)
-        };
-        let fallback_context_attributes = glutin::context::ContextAttributesBuilder::new()
-            .with_context_api(glutin::context::ContextApi::Gles(None))
-            .build(raw_window_handle);
+        if self.first_present {
+            self.first_present = false;
+            self.timing.mark_first_present();
 
-        let context_start = timing.stamp();
-        let not_current_gl_context = unsafe {
-            if timing.force_gles() {
-                gl_display
-                    .create_context(&gl_config, &context_attributes)
-                    .expect("failed to create forced OpenGL ES context")
-            } else {
-                gl_display
-                    .create_context(&gl_config, &context_attributes)
-                    .or_else(|_| {
-                        gl_display.create_context(&gl_config, &fallback_context_attributes)
-                    })
-                    .expect("failed to create OpenGL or OpenGL ES context")
+            #[cfg(feature = "timing")]
+            if self.timing.exit_after_first_present() {
+                event_loop.exit();
+                return;
             }
-        };
-        timing.report_context_create(context_start);
+        }
 
-        let window = window.take().unwrap_or_else(|| {
-            glutin_winit::finalize_window(event_loop, window_attributes, &gl_config)
-                .expect("failed to create Wayland window")
-        });
-
-        let (width, height): (u32, u32) = window.inner_size().into();
-        let width = NonZeroU32::new(width).unwrap_or(NonZeroU32::MIN);
-        let height = NonZeroU32::new(height).unwrap_or(NonZeroU32::MIN);
-
-        let surface_attributes =
-            glutin::surface::SurfaceAttributesBuilder::<glutin::surface::WindowSurface>::new()
-                .build(
-                    window
-                        .window_handle()
-                        .expect("failed to get Wayland window handle")
-                        .as_raw(),
-                    width,
-                    height,
-                );
-
-        let surface_start = timing.stamp();
-        let gl_surface = unsafe {
-            gl_display
-                .create_window_surface(&gl_config, &surface_attributes)
-                .expect("failed to create EGL window surface")
-        };
-        timing.report_surface_create(surface_start);
-
-        let current_start = timing.stamp();
-        let gl_context = not_current_gl_context
-            .make_current(&gl_surface)
-            .expect("failed to make OpenGL context current");
-        timing.report_make_current(current_start);
-        timing.report_context_api(gl_context.context_api());
-
-        let swap_interval_disabled = gl_surface
-            .set_swap_interval(&gl_context, glutin::surface::SwapInterval::DontWait)
-            .is_ok();
-        timing.report_swap_interval(swap_interval_disabled);
-
-        Self {
-            window,
-            gl_context,
-            _gl_display: gl_display,
-            gl_surface,
+        if followup_redraw {
+            window.request_redraw();
         }
     }
+}
 
-    #[inline]
-    fn window(&self) -> &Window {
-        &self.window
-    }
+#[derive(Default)]
+struct TextureStore {
+    images: HashMap<egui::TextureId, Texture>,
+}
 
-    fn resize(&self, physical_size: PhysicalSize<u32>) {
-        let Some(width) = NonZeroU32::new(physical_size.width) else {
-            return;
-        };
-        let Some(height) = NonZeroU32::new(physical_size.height) else {
-            return;
-        };
+struct Texture {
+    width: usize,
+    height: usize,
+    pixels: Vec<egui::Color32>,
+}
 
-        self.gl_surface.resize(&self.gl_context, width, height);
-    }
+impl TextureStore {
+    fn apply(&mut self, delta: &mut egui::TexturesDelta) {
+        for (id, image_deltas) in delta.set.drain() {
+            for image_delta in image_deltas {
+                let egui::ImageData::Color(image) = &image_delta.image;
+                let [patch_width, patch_height] = image.size;
 
-    #[inline]
-    fn swap_buffers(&self) -> glutin::error::Result<()> {
-        self.gl_surface.swap_buffers(&self.gl_context)
-    }
+                if let Some([x, y]) = image_delta.pos {
+                    let texture = self
+                        .images
+                        .get_mut(&id)
+                        .expect("partial texture update before full image");
+                    assert!(x + patch_width <= texture.width);
+                    assert!(y + patch_height <= texture.height);
 
-    #[inline]
-    fn get_proc_address(&self, address: &std::ffi::CStr) -> *const std::ffi::c_void {
-        self._gl_display.get_proc_address(address)
+                    for row in 0..patch_height {
+                        let source = &image.pixels[row * patch_width..(row + 1) * patch_width];
+                        let start = (y + row) * texture.width + x;
+                        texture.pixels[start..start + patch_width].copy_from_slice(source);
+                    }
+                } else {
+                    self.images.insert(
+                        id,
+                        Texture {
+                            width: patch_width,
+                            height: patch_height,
+                            pixels: image.pixels.clone(),
+                        },
+                    );
+                }
+            }
+        }
     }
 }
 
-fn window_attributes() -> WindowAttributes {
-    let size = LogicalSize::new(WINDOW_WIDTH, WINDOW_HEIGHT);
+fn rasterize(
+    target: &mut [u32],
+    width: usize,
+    height: usize,
+    pixels_per_point: f32,
+    primitives: &[egui::ClippedPrimitive],
+    textures: &TextureStore,
+) {
+    for clipped in primitives {
+        let Primitive::Mesh(mesh) = &clipped.primitive else {
+            continue;
+        };
+        let Some(texture) = textures.images.get(&mesh.texture_id) else {
+            continue;
+        };
 
-    Window::default_attributes()
-        .with_title("Glyphflick")
-        .with_inner_size(size)
-        .with_min_inner_size(size)
-        .with_max_inner_size(size)
-        .with_resizable(false)
-        .with_decorations(false)
-        .with_name("glyphflick", "glyphflick")
+        let clip = pixel_clip(clipped.clip_rect, width, height, pixels_per_point);
+        if clip.0 >= clip.2 || clip.1 >= clip.3 {
+            continue;
+        }
+
+        for triangle in mesh.indices.as_chunks::<3>().0 {
+            let a = mesh.vertices[triangle[0] as usize];
+            let b = mesh.vertices[triangle[1] as usize];
+            let c = mesh.vertices[triangle[2] as usize];
+            raster_triangle(target, width, clip, pixels_per_point, texture, a, b, c);
+        }
+    }
 }
 
-fn create_display(
-    event_loop: &ActiveEventLoop,
-    timing: Timing,
-) -> (GlutinWindowContext, egui_glow::glow::Context) {
-    let gl_window = GlutinWindowContext::new(event_loop, timing);
-    let loader_start = timing.stamp();
-    let gl = unsafe {
-        egui_glow::glow::Context::from_loader_function(|symbol| {
-            let symbol =
-                CString::new(symbol).expect("OpenGL procedure name unexpectedly contained NUL");
-            gl_window.get_proc_address(&symbol)
-        })
-    };
-    timing.report_gl_loader(loader_start);
+fn pixel_clip(
+    rect: egui::Rect,
+    width: usize,
+    height: usize,
+    pixels_per_point: f32,
+) -> (i32, i32, i32, i32) {
+    let min_x = (rect.min.x * pixels_per_point).round() as i32;
+    let min_y = (rect.min.y * pixels_per_point).round() as i32;
+    let max_x = (rect.max.x * pixels_per_point).round() as i32;
+    let max_y = (rect.max.y * pixels_per_point).round() as i32;
 
-    (gl_window, gl)
+    (
+        min_x.clamp(0, width as i32),
+        min_y.clamp(0, height as i32),
+        max_x.clamp(0, width as i32),
+        max_y.clamp(0, height as i32),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn raster_triangle(
+    target: &mut [u32],
+    target_width: usize,
+    clip: (i32, i32, i32, i32),
+    pixels_per_point: f32,
+    texture: &Texture,
+    a: egui::epaint::Vertex,
+    b: egui::epaint::Vertex,
+    c: egui::epaint::Vertex,
+) {
+    let p0 = [a.pos.x * pixels_per_point, a.pos.y * pixels_per_point];
+    let p1 = [b.pos.x * pixels_per_point, b.pos.y * pixels_per_point];
+    let p2 = [c.pos.x * pixels_per_point, c.pos.y * pixels_per_point];
+    let area = edge(p0, p1, p2);
+    if area.abs() < f32::EPSILON {
+        return;
+    }
+
+    let min_x = p0[0].min(p1[0]).min(p2[0]).floor() as i32;
+    let min_y = p0[1].min(p1[1]).min(p2[1]).floor() as i32;
+    let max_x = p0[0].max(p1[0]).max(p2[0]).ceil() as i32;
+    let max_y = p0[1].max(p1[1]).max(p2[1]).ceil() as i32;
+
+    let min_x = min_x.max(clip.0);
+    let min_y = min_y.max(clip.1);
+    let max_x = max_x.min(clip.2);
+    let max_y = max_y.min(clip.3);
+    if min_x >= max_x || min_y >= max_y {
+        return;
+    }
+
+    let inv_area = area.recip();
+    let ca = a.color.to_array();
+    let cb = b.color.to_array();
+    let cc = c.color.to_array();
+
+    for y in min_y..max_y {
+        for x in min_x..max_x {
+            let p = [x as f32 + 0.5, y as f32 + 0.5];
+            let w0 = edge(p1, p2, p) * inv_area;
+            let w1 = edge(p2, p0, p) * inv_area;
+            let w2 = 1.0 - w0 - w1;
+            if w0 < -0.0001 || w1 < -0.0001 || w2 < -0.0001 {
+                continue;
+            }
+
+            let uv_x = w0 * a.uv.x + w1 * b.uv.x + w2 * c.uv.x;
+            let uv_y = w0 * a.uv.y + w1 * b.uv.y + w2 * c.uv.y;
+            let texel = sample_nearest(texture, uv_x, uv_y).to_array();
+
+            let vertex = [
+                lerp_channel(ca[0], cb[0], cc[0], w0, w1, w2),
+                lerp_channel(ca[1], cb[1], cc[1], w0, w1, w2),
+                lerp_channel(ca[2], cb[2], cc[2], w0, w1, w2),
+                lerp_channel(ca[3], cb[3], cc[3], w0, w1, w2),
+            ];
+
+            let src = [
+                mul_u8(texel[0], vertex[0]),
+                mul_u8(texel[1], vertex[1]),
+                mul_u8(texel[2], vertex[2]),
+                mul_u8(texel[3], vertex[3]),
+            ];
+            let index = y as usize * target_width + x as usize;
+            target[index] = blend_over_rgb(target[index], src);
+        }
+    }
+}
+
+#[inline(always)]
+fn edge(a: [f32; 2], b: [f32; 2], p: [f32; 2]) -> f32 {
+    (p[0] - a[0]) * (b[1] - a[1]) - (p[1] - a[1]) * (b[0] - a[0])
+}
+
+#[inline(always)]
+fn lerp_channel(a: u8, b: u8, c: u8, w0: f32, w1: f32, w2: f32) -> u8 {
+    (w0 * a as f32 + w1 * b as f32 + w2 * c as f32)
+        .round()
+        .clamp(0.0, 255.0) as u8
+}
+
+#[inline(always)]
+fn mul_u8(a: u8, b: u8) -> u8 {
+    ((a as u16 * b as u16 + 127) / 255) as u8
+}
+
+#[inline(always)]
+fn sample_nearest(texture: &Texture, u: f32, v: f32) -> egui::Color32 {
+    let x = (u.clamp(0.0, 1.0) * texture.width as f32)
+        .floor()
+        .min((texture.width - 1) as f32) as usize;
+    let y = (v.clamp(0.0, 1.0) * texture.height as f32)
+        .floor()
+        .min((texture.height - 1) as f32) as usize;
+    texture.pixels[y * texture.width + x]
+}
+
+#[inline(always)]
+fn blend_over_rgb(dst: u32, src: [u8; 4]) -> u32 {
+    let inv_alpha = 255_u32 - src[3] as u32;
+    let dst_r = (dst >> 16) & 0xff;
+    let dst_g = (dst >> 8) & 0xff;
+    let dst_b = dst & 0xff;
+
+    let out_r = (src[0] as u32 + (dst_r * inv_alpha + 127) / 255).min(255);
+    let out_g = (src[1] as u32 + (dst_g * inv_alpha + 127) / 255).min(255);
+    let out_b = (src[2] as u32 + (dst_b * inv_alpha + 127) / 255).min(255);
+
+    (out_r << 16) | (out_g << 8) | out_b
 }

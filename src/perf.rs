@@ -13,12 +13,14 @@ pub struct Timing {
     #[cfg(feature = "timing")]
     process_start: Instant,
     #[cfg(feature = "timing")]
+    exit_after_first_present: bool,
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     exit_after_first_swap: bool,
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     exit_after_second_swap: bool,
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     defer_grid: bool,
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     force_gles: bool,
 }
 
@@ -29,12 +31,14 @@ impl Default for Timing {
             #[cfg(feature = "timing")]
             process_start: Instant::now(),
             #[cfg(feature = "timing")]
+            exit_after_first_present: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_PRESENT").is_some(),
+            #[cfg(all(feature = "timing", feature = "legacy-gl"))]
             exit_after_first_swap: std::env::var_os("GLYPHFLICK_EXIT_AFTER_FIRST_SWAP").is_some(),
-            #[cfg(feature = "timing")]
+            #[cfg(all(feature = "timing", feature = "legacy-gl"))]
             exit_after_second_swap: std::env::var_os("GLYPHFLICK_EXIT_AFTER_SECOND_SWAP").is_some(),
-            #[cfg(feature = "timing")]
+            #[cfg(all(feature = "timing", feature = "legacy-gl"))]
             defer_grid: std::env::var_os("GLYPHFLICK_DEFER_GRID").is_some(),
-            #[cfg(feature = "timing")]
+            #[cfg(all(feature = "timing", feature = "legacy-gl"))]
             force_gles: std::env::var_os("GLYPHFLICK_FORCE_GLES").is_some(),
         }
     }
@@ -149,11 +153,17 @@ impl Timing {
 
     #[cfg(feature = "timing")]
     #[inline(always)]
+    pub const fn exit_after_first_present(self) -> bool {
+        self.exit_after_first_present
+    }
+
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
+    #[inline(always)]
     pub const fn exit_after_first_swap(self) -> bool {
         self.exit_after_first_swap
     }
 
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub const fn exit_after_second_swap(self) -> bool {
         self.exit_after_second_swap
@@ -161,12 +171,12 @@ impl Timing {
 
     #[inline(always)]
     pub const fn defer_grid(self) -> bool {
-        #[cfg(feature = "timing")]
+        #[cfg(all(feature = "timing", feature = "legacy-gl"))]
         {
             self.defer_grid
         }
 
-        #[cfg(not(feature = "timing"))]
+        #[cfg(not(all(feature = "timing", feature = "legacy-gl")))]
         {
             false
         }
@@ -174,17 +184,18 @@ impl Timing {
 
     #[inline(always)]
     pub const fn force_gles(self) -> bool {
-        #[cfg(feature = "timing")]
+        #[cfg(all(feature = "timing", feature = "legacy-gl"))]
         {
             self.force_gles
         }
 
-        #[cfg(not(feature = "timing"))]
+        #[cfg(not(all(feature = "timing", feature = "legacy-gl")))]
         {
             false
         }
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_gl_config(
         self,
@@ -204,6 +215,7 @@ impl Timing {
         let _ = (self, alpha, depth, stencil, samples, hardware, api);
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_display_build(self, start: Stamp) {
         #[cfg(feature = "timing")]
@@ -216,6 +228,7 @@ impl Timing {
         let _ = (self, start);
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_context_create(self, start: Stamp) {
         #[cfg(feature = "timing")]
@@ -228,6 +241,7 @@ impl Timing {
         let _ = (self, start);
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_surface_create(self, start: Stamp) {
         #[cfg(feature = "timing")]
@@ -240,6 +254,7 @@ impl Timing {
         let _ = (self, start);
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_make_current(self, start: Stamp) {
         #[cfg(feature = "timing")]
@@ -252,6 +267,7 @@ impl Timing {
         let _ = (self, start);
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_gl_loader(self, start: Stamp) {
         #[cfg(feature = "timing")]
@@ -264,6 +280,7 @@ impl Timing {
         let _ = (self, start);
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_context_api(self, api: glutin::context::ContextApi) {
         #[cfg(feature = "timing")]
@@ -273,7 +290,7 @@ impl Timing {
         let _ = (self, api);
     }
 
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub fn report_first_egui_run(self, start: Stamp) {
         eprintln!(
@@ -282,7 +299,7 @@ impl Timing {
         );
     }
 
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub fn report_second_egui_run(self, start: Stamp) {
         eprintln!(
@@ -291,7 +308,7 @@ impl Timing {
         );
     }
 
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub fn report_first_gl_paint(self, start: Stamp) {
         eprintln!(
@@ -300,7 +317,7 @@ impl Timing {
         );
     }
 
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub fn report_second_gl_paint(self, start: Stamp) {
         eprintln!(
@@ -309,7 +326,7 @@ impl Timing {
         );
     }
 
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub fn report_first_swap_call(self, start: Stamp) {
         eprintln!(
@@ -318,7 +335,7 @@ impl Timing {
         );
     }
 
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub fn report_second_swap_call(self, start: Stamp) {
         eprintln!(
@@ -327,7 +344,7 @@ impl Timing {
         );
     }
 
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub fn mark_first_swap(self) {
         eprintln!(
@@ -336,13 +353,127 @@ impl Timing {
         );
     }
 
-    #[cfg(feature = "timing")]
+    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub fn mark_second_swap(self) {
         eprintln!(
             "glyphflick timing startup_to_second_swap_complete_us={}",
             self.process_start.elapsed().as_micros()
         );
+    }
+
+    #[inline(always)]
+    pub fn report_context_init(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!("glyphflick timing context_init_us={}", start.elapsed().as_micros());
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_window_surface_init(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing window_surface_init_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_egui_winit_init(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing egui_winit_init_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_egui_app_init(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing egui_app_init_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_egui_run(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!("glyphflick timing egui_run_us={}", start.elapsed().as_micros());
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_tessellate(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing tessellate_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_texture_update(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing texture_update_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_software_raster(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing software_raster_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_present_call(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing present_call_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn mark_first_present(self) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing startup_to_first_present_us={}",
+            self.process_start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = self;
     }
 
     #[inline(always)]
