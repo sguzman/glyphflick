@@ -238,7 +238,6 @@ impl Runtime {
             #[cfg(feature = "timing")]
             if self.timing.exit_after_first_present() {
                 event_loop.exit();
-                return;
             }
         }
     }
