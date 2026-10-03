@@ -307,7 +307,6 @@ name = "ecolor"
 version = "0.36.1"
 source = "git+https://github.com/emilk/egui.git?rev=f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9#f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9"
 dependencies = [
- "bytemuck",
  "emath",
 ]
 
@@ -356,9 +355,6 @@ checksum = "252afb9ae5eaa683babdc6a068b3f5726eb19e05070c731f9b2a23a7c3e8ed34"
 name = "emath"
 version = "0.36.1"
 source = "git+https://github.com/emilk/egui.git?rev=f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9#f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9"
-dependencies = [
- "bytemuck",
-]
 
 [[package]]
 name = "emojis"
@@ -375,7 +371,6 @@ version = "0.36.1"
 source = "git+https://github.com/emilk/egui.git?rev=f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9#f2de65f636cdc7bbf662b4a5482f1385ce2a0bb9"
 dependencies = [
  "ahash",
- "bytemuck",
  "ecolor",
  "emath",
  "font-types",
@@ -469,9 +464,9 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "font-types"
-version = "0.12.5"
+version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8eb065f3251655b3c90e22e5e363f310fc5332fb3402e37bbc94752283248f6"
+checksum = "6c92d9081c7ab3bd83ef1eecdfad090f3d966e3ce74106779664114cfe1a6274"
 dependencies = [
  "bytemuck",
 ]
@@ -1064,7 +1059,7 @@ checksum = "a1a1ae721c5e35be65f01a03b6d2ac13a54cb4fa70d8a5da293d7b0020261398"
 dependencies = [
  "block2",
  "objc2 0.5.2",
- "objc2-app-kit 0.2.2",
+ "objc2-app-kit",
  "objc2-foundation 0.2.2",
 ]
 
@@ -1997,7 +1992,6 @@ checksum = "d8eab23fefc9e41f8e841df4a9c707e8a8c4ed26e944ef69297184de2785e3be"
 dependencies = [
  "dlib",
  "log",
- "once_cell",
  "pkg-config",
 ]
 
@@ -2150,7 +2144,7 @@ dependencies = [
  "memmap2",
  "ndk",
  "objc2 0.5.2",
- "objc2-app-kit 0.2.2",
+ "objc2-app-kit",
  "objc2-foundation 0.2.2",
  "objc2-ui-kit 0.2.2",
  "orbclient",
