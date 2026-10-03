@@ -29,6 +29,11 @@ name = "glyphflick-softbuffer-probe"
 path = "src/bin/softbuffer_probe.rs"
 required-features = ["softbuffer-probe"]
 
+[[bin]]
+name = "glyphflick-software-ui-probe"
+path = "src/bin/software_ui_probe.rs"
+required-features = ["softbuffer-probe"]
+
 [profile.release]
 opt-level = 3
 lto = "fat"

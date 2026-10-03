@@ -32,9 +32,10 @@ echo "git_commit=$(git rev-parse --short=12 HEAD)"
 echo "rustc=$(rustc --version)"
 echo
 
-echo "[1/4] building measured binaries"
+echo "[1/5] building measured binaries"
 cargo build --release --locked --features timing --bin glyphflick
 cargo build --release --locked --features softbuffer-probe --bin glyphflick-softbuffer-probe
+cargo build --release --locked --features softbuffer-probe --bin glyphflick-software-ui-probe
 
 summarize_metric() {
   local log="$1"
@@ -151,6 +152,45 @@ run_softbuffer() {
   rm -f "$log"
 }
 
+
+run_software_ui() {
+  local log
+  log="$(mktemp)"
+
+  echo
+  echo "[software-ui] measuring $runs launches"
+
+  for ((run = 1; run <= runs; run++)); do
+    printf -- "--- run %d ---\n" "$run" >>"$log"
+    ./target/release/glyphflick-software-ui-probe 2>>"$log"
+  done
+
+  for key in \
+    event_loop_init_us \
+    context_init_us \
+    startup_to_resumed_us \
+    window_surface_init_us \
+    egui_app_init_us \
+    egui_run_us \
+    tessellate_us \
+    texture_update_us \
+    software_raster_us \
+    present_call_us \
+    startup_to_first_present_us
+  do
+    summarize_metric "$log" software-ui "$key"
+  done
+
+  {
+    echo
+    echo "Raw software-ui log:"
+    cat "$log"
+    echo
+  } >>"$report"
+
+  rm -f "$log"
+}
+
 {
   echo "Glyphflick latency probe"
   echo "Wayland display: $WAYLAND_DISPLAY"
@@ -160,16 +200,20 @@ run_softbuffer() {
   echo
 } >>"$report"
 
-echo "[2/4] production frame"
+echo "[2/5] production frame"
 run_gl_mode production false
 
 echo
-echo "[3/4] deferred-grid two-frame experiment"
+echo "[3/5] deferred-grid two-frame experiment"
 run_gl_mode deferred true
 
 echo
-echo "[4/4] software presenter"
+echo "[4/5] flat software presenter"
 run_softbuffer
+
+echo
+echo "[5/5] real egui software presenter"
+run_software_ui
 
 echo
 echo "probe_report=$report"
