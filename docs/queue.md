@@ -347,3 +347,6 @@ When an item begins, update its status to `IN PROGRESS`.
 When implementation lands but host QA is required, use `CODE COMPLETE / QA PENDING`.
 
 Only use `DONE` when its acceptance criteria are actually satisfied.
+
+
+Measured architecture result: the real-egui software path reached a 24.517 ms median first present versus 54.677 ms for production OpenGL, a 30.160 ms / ~55% reduction. The software path is now an interactive production-shaped candidate with real egui-winit input handling. Next gate: measure that candidate on the target host, then promote only if the latency advantage survives and interaction remains intact.
