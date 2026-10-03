@@ -205,7 +205,7 @@ impl Runtime {
         buffer.fill(CLEAR_PIXEL);
 
         let raster_start = self.timing.stamp();
-        rasterize(
+        let raster_stats = rasterize(
             &mut buffer,
             width as usize,
             height as usize,
@@ -214,6 +214,10 @@ impl Runtime {
             &self.textures,
         );
         self.timing.report_software_raster(raster_start);
+        self.timing.report_raster_mix(
+            raster_stats.fast_quads,
+            raster_stats.fallback_triangles,
+        );
 
         let present_start = self.timing.stamp();
         buffer
@@ -288,6 +292,12 @@ impl TextureStore {
     }
 }
 
+#[derive(Default)]
+struct RasterStats {
+    fast_quads: usize,
+    fallback_triangles: usize,
+}
+
 fn rasterize(
     target: &mut [u32],
     width: usize,
@@ -295,7 +305,9 @@ fn rasterize(
     pixels_per_point: f32,
     primitives: &[egui::ClippedPrimitive],
     textures: &TextureStore,
-) {
+) -> RasterStats {
+    let mut stats = RasterStats::default();
+
     for clipped in primitives {
         let Primitive::Mesh(mesh) = &clipped.primitive else {
             continue;
@@ -309,11 +321,123 @@ fn rasterize(
             continue;
         }
 
-        for triangle in mesh.indices.as_chunks::<3>().0 {
+        let mut cursor = 0;
+        while cursor + 3 <= mesh.indices.len() {
+            if cursor + 6 <= mesh.indices.len() {
+                let indices = &mesh.indices[cursor..cursor + 6];
+                if let Some(vertices) = canonical_quad(mesh, indices) {
+                    raster_quad(
+                        target,
+                        width,
+                        clip,
+                        pixels_per_point,
+                        texture,
+                        vertices,
+                    );
+                    stats.fast_quads += 1;
+                    cursor += 6;
+                    continue;
+                }
+            }
+
+            let triangle = &mesh.indices[cursor..cursor + 3];
             let a = mesh.vertices[triangle[0] as usize];
             let b = mesh.vertices[triangle[1] as usize];
             let c = mesh.vertices[triangle[2] as usize];
             raster_triangle(target, width, clip, pixels_per_point, texture, a, b, c);
+            stats.fallback_triangles += 1;
+            cursor += 3;
+        }
+    }
+
+    stats
+}
+
+fn canonical_quad(
+    mesh: &egui::Mesh,
+    indices: &[u32],
+) -> Option<[egui::epaint::Vertex; 4]> {
+    let [i0, i1, i2, j2, j1, i3] = *indices else {
+        return None;
+    };
+    if i2 != j2 || i1 != j1 {
+        return None;
+    }
+
+    let vertices = [
+        mesh.vertices[i0 as usize],
+        mesh.vertices[i1 as usize],
+        mesh.vertices[i2 as usize],
+        mesh.vertices[i3 as usize],
+    ];
+    let [a, b, c, d] = vertices;
+
+    let rectangular_positions = a.pos.y == b.pos.y
+        && c.pos.y == d.pos.y
+        && a.pos.x == c.pos.x
+        && b.pos.x == d.pos.x
+        && a.pos.x < b.pos.x
+        && a.pos.y < c.pos.y;
+    let rectangular_uvs = a.uv.y == b.uv.y
+        && c.uv.y == d.uv.y
+        && a.uv.x == c.uv.x
+        && b.uv.x == d.uv.x;
+    let uniform_color = a.color == b.color && a.color == c.color && a.color == d.color;
+
+    (rectangular_positions && rectangular_uvs && uniform_color).then_some(vertices)
+}
+
+fn raster_quad(
+    target: &mut [u32],
+    target_width: usize,
+    clip: (i32, i32, i32, i32),
+    pixels_per_point: f32,
+    texture: &Texture,
+    [a, b, c, _d]: [egui::epaint::Vertex; 4],
+) {
+    let left = a.pos.x * pixels_per_point;
+    let right = b.pos.x * pixels_per_point;
+    let top = a.pos.y * pixels_per_point;
+    let bottom = c.pos.y * pixels_per_point;
+
+    let min_x = (left.floor() as i32).max(clip.0);
+    let min_y = (top.floor() as i32).max(clip.1);
+    let max_x = (right.ceil() as i32).min(clip.2);
+    let max_y = (bottom.ceil() as i32).min(clip.3);
+    if min_x >= max_x || min_y >= max_y {
+        return;
+    }
+
+    let inv_width = (right - left).recip();
+    let inv_height = (bottom - top).recip();
+    let du = b.uv.x - a.uv.x;
+    let dv = c.uv.y - a.uv.y;
+    let tint = a.color.to_array();
+
+    for y in min_y..max_y {
+        let py = y as f32 + 0.5;
+        if py < top || py > bottom {
+            continue;
+        }
+        let ty = (py - top) * inv_height;
+        let v = a.uv.y + ty * dv;
+
+        for x in min_x..max_x {
+            let px = x as f32 + 0.5;
+            if px < left || px > right {
+                continue;
+            }
+            let tx = (px - left) * inv_width;
+            let u = a.uv.x + tx * du;
+            let texel = sample_nearest(texture, u, v).to_array();
+            let src = [
+                mul_u8(texel[0], tint[0]),
+                mul_u8(texel[1], tint[1]),
+                mul_u8(texel[2], tint[2]),
+                mul_u8(texel[3], tint[3]),
+            ];
+            let index = y as usize * target_width + x as usize;
+            target[index] = blend_over_rgb(target[index], src);
         }
     }
 }
@@ -447,4 +571,93 @@ fn blend_over_rgb(dst: u32, src: [u8; 4]) -> u32 {
     let out_b = (src[2] as u32 + (dst_b * inv_alpha + 127) / 255).min(255);
 
     (out_r << 16) | (out_g << 8) | out_b
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonical_quad_matches_epaint_rect_topology() {
+        let mut mesh = egui::Mesh::default();
+        mesh.add_rect_with_uv(
+            egui::Rect::from_min_max(egui::pos2(1.0, 2.0), egui::pos2(5.0, 7.0)),
+            egui::Rect::from_min_max(egui::pos2(0.1, 0.2), egui::pos2(0.8, 0.9)),
+            egui::Color32::WHITE,
+        );
+
+        assert!(canonical_quad(&mesh, &mesh.indices).is_some());
+    }
+
+    #[test]
+    fn canonical_quad_rejects_non_rectangular_mesh() {
+        let mut mesh = egui::Mesh::default();
+        mesh.vertices.extend_from_slice(&[
+            egui::epaint::Vertex {
+                pos: egui::pos2(0.0, 0.0),
+                uv: egui::pos2(0.0, 0.0),
+                color: egui::Color32::WHITE,
+            },
+            egui::epaint::Vertex {
+                pos: egui::pos2(2.0, 0.0),
+                uv: egui::pos2(1.0, 0.0),
+                color: egui::Color32::WHITE,
+            },
+            egui::epaint::Vertex {
+                pos: egui::pos2(1.0, 2.0),
+                uv: egui::pos2(0.0, 1.0),
+                color: egui::Color32::WHITE,
+            },
+            egui::epaint::Vertex {
+                pos: egui::pos2(2.0, 2.0),
+                uv: egui::pos2(1.0, 1.0),
+                color: egui::Color32::WHITE,
+            },
+        ]);
+        mesh.indices.extend_from_slice(&[0, 1, 2, 2, 1, 3]);
+
+        assert!(canonical_quad(&mesh, &mesh.indices).is_none());
+    }
+
+    #[test]
+    fn quad_fast_path_preserves_texture_orientation() {
+        let texture = Texture {
+            width: 2,
+            height: 2,
+            pixels: vec![
+                egui::Color32::from_rgb(255, 0, 0),
+                egui::Color32::from_rgb(0, 255, 0),
+                egui::Color32::from_rgb(0, 0, 255),
+                egui::Color32::from_rgb(255, 255, 255),
+            ],
+        };
+        let vertices = [
+            egui::epaint::Vertex {
+                pos: egui::pos2(0.0, 0.0),
+                uv: egui::pos2(0.0, 0.0),
+                color: egui::Color32::WHITE,
+            },
+            egui::epaint::Vertex {
+                pos: egui::pos2(2.0, 0.0),
+                uv: egui::pos2(1.0, 0.0),
+                color: egui::Color32::WHITE,
+            },
+            egui::epaint::Vertex {
+                pos: egui::pos2(0.0, 2.0),
+                uv: egui::pos2(0.0, 1.0),
+                color: egui::Color32::WHITE,
+            },
+            egui::epaint::Vertex {
+                pos: egui::pos2(2.0, 2.0),
+                uv: egui::pos2(1.0, 1.0),
+                color: egui::Color32::WHITE,
+            },
+        ];
+        let mut target = [0_u32; 4];
+
+        raster_quad(&mut target, 2, (0, 0, 2, 2), 1.0, &texture, vertices);
+
+        assert_eq!(target, [0x00ff_0000, 0x0000_ff00, 0x0000_00ff, 0x00ff_ffff]);
+    }
 }
