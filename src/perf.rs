@@ -460,6 +460,18 @@ impl Timing {
     }
 
     #[inline(always)]
+    pub fn report_raster_mix(self, fast_quads: usize, fallback_triangles: usize) {
+        #[cfg(feature = "timing")]
+        {
+            eprintln!("glyphflick timing raster_fast_quads={fast_quads}");
+            eprintln!("glyphflick timing raster_fallback_triangles={fallback_triangles}");
+        }
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, fast_quads, fallback_triangles);
+    }
+
+    #[inline(always)]
     pub fn report_present_call(self, start: Stamp) {
         #[cfg(feature = "timing")]
         eprintln!(
