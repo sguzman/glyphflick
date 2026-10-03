@@ -240,7 +240,7 @@ Still needed:
 
 ## Q012 — Startup optimization pass
 
-**Status: IN PROGRESS / TARGET BASELINE CAPTURED**
+**Status: IN PROGRESS / SOFTWARE RUNTIME PROMOTED**
 
 Already applied before measurement because they remove obviously unused machinery:
 
@@ -278,7 +278,7 @@ The deferred-grid shell is therefore diagnostic only and is not promoted: it imp
 
 The flat softbuffer result is large enough to justify removing EGL as an active architecture candidate. A probe-only real-egui software renderer is now in-tree as `glyphflick-software-ui-probe`. It reuses the actual Glyphflick app, corpus, font atlas, and egui tessellation, then rasterizes the resulting meshes into softbuffer. The next target measurement decides whether CPU rendering preserves the flat-presenter startup advantage once the real UI is included.
 
-The softbuffer dependency and software renderer remain probe-only and are excluded from the normal production feature set. Runtime-budget CI still reports the normal release at 6,181,056 bytes / 5.895 MiB.
+Softbuffer and the CPU renderer are now the normal production path. EGL/glutin/egui_glow are feature-gated behind the legacy comparison binary and rejected from the default runtime dependency graph. Runtime-budget CI reports the promoted software release at approximately 5.77 MiB.
 
 ## Q013 — Real Wayland QA
 
@@ -349,4 +349,4 @@ When implementation lands but host QA is required, use `CODE COMPLETE / QA PENDI
 Only use `DONE` when its acceptance criteria are actually satisfied.
 
 
-Measured architecture result: the real-egui software path reached a 24.517 ms median first present versus 54.677 ms for production OpenGL, a 30.160 ms / ~55% reduction. The software path is now an interactive production-shaped candidate with real egui-winit input handling. Next gate: measure that candidate on the target host, then promote only if the latency advantage survives and interaction remains intact.
+Measured architecture result: production software presentation is now promoted. The latest seven-launch target run reached a 24.488 ms median first present versus 56.162 ms for the retained legacy OpenGL path, a 31.674 ms / 56.4% reduction. The first conservative quad raster fast path matched 93 quads and left 70 generic fallback triangles, with an 8.936 ms raster median. Next gate: split the remaining ~11.9 ms egui run into app/search/grid versus egui post-closure work before choosing the next optimization.
