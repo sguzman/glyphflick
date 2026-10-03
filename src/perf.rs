@@ -83,6 +83,7 @@ impl Timing {
         let _ = self;
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_runtime_init(self, start: Stamp) {
         #[cfg(feature = "timing")]
@@ -95,6 +96,7 @@ impl Timing {
         let _ = (self, start);
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_egui_init(self, start: Stamp) {
         #[cfg(feature = "timing")]
@@ -107,6 +109,7 @@ impl Timing {
         let _ = (self, start);
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_swap_interval(self, disabled: bool) {
         #[cfg(feature = "timing")]
@@ -183,6 +186,7 @@ impl Timing {
         }
     }
 
+    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub const fn force_gles(self) -> bool {
         #[cfg(all(feature = "timing", feature = "legacy-gl"))]
@@ -409,6 +413,42 @@ impl Timing {
 
         #[cfg(not(feature = "timing"))]
         let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_app_ui(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing app_ui_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_ui_search(self, start: Stamp) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing ui_search_us={}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start);
+    }
+
+    #[inline(always)]
+    pub fn report_ui_grid(self, start: Stamp, rendered_items: usize) {
+        #[cfg(feature = "timing")]
+        eprintln!(
+            "glyphflick timing ui_grid_us={} ui_grid_items={rendered_items}",
+            start.elapsed().as_micros()
+        );
+
+        #[cfg(not(feature = "timing"))]
+        let _ = (self, start, rendered_items);
     }
 
     #[inline(always)]
