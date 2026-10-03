@@ -12,6 +12,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, OwnedDisplayHan
 use winit::platform::wayland::WindowAttributesExtWayland as _;
 use winit::window::{Window, WindowId};
 
+#[allow(dead_code)]
 #[path = "../app.rs"]
 mod app;
 #[path = "../clipboard.rs"]
@@ -22,6 +23,7 @@ mod corpus;
 mod fonts;
 #[path = "../navigation.rs"]
 mod navigation;
+#[allow(dead_code)]
 #[path = "../perf.rs"]
 mod perf;
 #[path = "../search.rs"]
@@ -314,7 +316,7 @@ fn rasterize(
             continue;
         }
 
-        for triangle in mesh.indices.chunks_exact(3) {
+        for triangle in mesh.indices.as_chunks::<3>().0 {
             let a = mesh.vertices[triangle[0] as usize];
             let b = mesh.vertices[triangle[1] as usize];
             let c = mesh.vertices[triangle[2] as usize];
