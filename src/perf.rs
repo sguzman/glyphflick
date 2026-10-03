@@ -71,9 +71,6 @@ impl Timing {
         let _ = self;
     }
 
-    #[cfg(feature = "legacy-gl")]
-    #[cfg(feature = "legacy-gl")]
-    #[cfg(feature = "legacy-gl")]
     #[inline(always)]
     pub fn report_font_init(self, start: Stamp, system_emoji_mapped: bool) {
         #[cfg(feature = "timing")]
@@ -116,8 +113,6 @@ impl Timing {
         self.exit_after_first_present
     }
 
-    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
-    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub const fn suppress_grid_text(self) -> bool {
         #[cfg(feature = "timing")]
@@ -131,22 +126,6 @@ impl Timing {
         }
     }
 
-    #[cfg(feature = "legacy-gl")]
-    #[cfg(feature = "legacy-gl")]
-    #[cfg(feature = "legacy-gl")]
-    #[cfg(feature = "legacy-gl")]
-    #[cfg(feature = "legacy-gl")]
-    #[cfg(feature = "legacy-gl")]
-    #[cfg(feature = "legacy-gl")]
-    #[cfg(feature = "legacy-gl")]
-    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
-    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
-    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
-    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
-    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
-    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
-    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
-    #[cfg(all(feature = "timing", feature = "legacy-gl"))]
     #[inline(always)]
     pub fn report_context_init(self, start: Stamp) {
         #[cfg(feature = "timing")]
