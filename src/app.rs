@@ -240,16 +240,26 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
                                 let glyph = self.corpus.get(index);
                                 rendered_items += 1;
 
-                                let response = ui
-                                    .add_sized(
+                                let selected = active == Some(position);
+                                let response = if self.timing.fast_grid() {
+                                    fast_glyph_cell(
+                                        ui,
+                                        selected,
+                                        glyph.text(),
+                                        glyph.name(),
+                                        &self.emoji_font,
+                                    )
+                                } else {
+                                    ui.add_sized(
                                         [CELL_SIZE, CELL_SIZE],
                                         egui::Button::selectable(
-                                            active == Some(position),
+                                            selected,
                                             egui::RichText::new(glyph.text())
                                                 .font(self.emoji_font.clone()),
                                         ),
                                     )
-                                    .on_hover_text(glyph.name());
+                                    .on_hover_text(glyph.name())
+                                };
 
                                 if response.clicked() {
                                     picked = Some(glyph.text());
@@ -282,6 +292,51 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
             self.commit(text);
         }
     }
+}
+
+fn fast_glyph_cell(
+    ui: &mut egui::Ui,
+    selected: bool,
+    text: &str,
+    name: &str,
+    font: &egui::FontId,
+) -> egui::Response {
+    let (rect, response) =
+        ui.allocate_exact_size(egui::Vec2::splat(CELL_SIZE), egui::Sense::click());
+
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(
+            egui::WidgetType::Button,
+            ui.is_enabled(),
+            selected,
+            text,
+        )
+    });
+
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.style().interact_selectable(&response, selected);
+        let paint_rect = rect.expand(visuals.expansion);
+
+        if selected || response.hovered() {
+            ui.painter().rect(
+                paint_rect,
+                visuals.corner_radius,
+                visuals.weak_bg_fill,
+                visuals.bg_stroke,
+                egui::StrokeKind::Inside,
+            );
+        }
+
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            text,
+            font.clone(),
+            visuals.text_color(),
+        );
+    }
+
+    response.on_hover_text(name)
 }
 
 #[cfg(test)]
