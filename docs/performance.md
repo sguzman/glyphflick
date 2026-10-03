@@ -248,3 +248,37 @@ Interpretation:
 3. a flat Wayland softbuffer presenter, with setup, buffer acquisition/fill, present-call, and process-to-first-present timings.
 
 The softbuffer crate is gated behind the `softbuffer-probe` feature and is absent from the normal production dependency tree. CI compiles it under all-features/all-targets, while the runtime-budget workflow confirms the default release remains 6,181,056 bytes / 5.895 MiB.
+
+
+### Flat softbuffer and deferred-grid target result
+
+The seven-launch combined architecture probe resolved both outstanding questions.
+
+Median values:
+
+| Mode | First useful/present milestone | Fully populated milestone |
+| --- | ---: | ---: |
+| Production OpenGL | 54.314 ms first completed swap | 54.314 ms |
+| Deferred grid | 42.915 ms shell swap | 56.001 ms second populated swap |
+| Flat softbuffer | 3.074 ms first present | n/a — flat presenter only |
+
+The deferred-grid experiment is not promoted. It proves that the first egui grid pass accounts for roughly 11 ms, but merely moving that work to a second frame makes the actual populated picker slightly slower than production.
+
+The softbuffer result is architecturally significant. Its median process-start-to-present time is 3.074 ms, with only about 0.715 ms in window creation, 0.022 ms in buffer acquisition, 0.466 ms in filling the entire 560×440 buffer, and 0.008 ms in the present call. This demonstrates that the existing ~30 ms EGL display/config/window path is avoidable presentation-stack cost rather than an unavoidable Wayland window cost.
+
+This does **not** by itself prove that a software-rendered Glyphflick is faster, because the flat presenter contains no egui tessellation, font-atlas upload, texture sampling, or UI rasterization.
+
+### Real-egui software renderer probe
+
+The next measurement closes that gap. `glyphflick-software-ui-probe` is gated behind `softbuffer-probe` and:
+
+1. creates the same fixed-size Wayland window through softbuffer;
+2. constructs the real Glyphflick egui context, mmap-backed Noto Color Emoji setup, corpus, search state, and UI;
+3. runs the actual first egui frame and tessellates it;
+4. applies egui texture deltas, including the real color-emoji/font atlas, to CPU texture storage;
+5. rasterizes egui meshes into the softbuffer back buffer using clipped textured triangles and premultiplied-alpha blending;
+6. presents once and exits.
+
+The probe reports egui app initialization, egui run, tessellation, texture update, software rasterization, present-call, and process-to-first-present separately.
+
+This renderer is intentionally experimental. It is not production code and cannot displace OpenGL until target measurements show a material end-to-end win with the real UI. CI compiles/tests/clippy-checks the probe, while the normal runtime budget remains 6,181,056 bytes / 5.895 MiB and rejects forbidden production dependencies.

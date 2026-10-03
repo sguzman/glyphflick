@@ -268,13 +268,17 @@ Already applied before measurement because they remove obviously unused machiner
 
 Measured target work now establishes that EGL display/config/window creation (~30–31 ms median) and the first egui UI pass (~12 ms median) dominate startup. Alpha-zero is promoted to production.
 
-The next target experiment is automated by `scripts/latency-probe.sh` and compares:
+The combined target architecture probe is complete:
 
-- the production alpha-zero OpenGL frame;
-- a timing-only deferred-grid first frame, including time to the second fully populated swap;
-- a probe-only Wayland softbuffer flat presenter to determine whether removing EGL is architecturally worthwhile.
+- production OpenGL median first completed swap: 54.314 ms;
+- deferred-grid median shell swap: 42.915 ms, but median fully populated second swap: 56.001 ms;
+- flat Wayland softbuffer median first present: 3.074 ms.
 
-The softbuffer dependency is optional and excluded from the normal production feature set.
+The deferred-grid shell is therefore diagnostic only and is not promoted: it improves empty-shell visibility while slightly delaying the useful populated frame.
+
+The flat softbuffer result is large enough to justify removing EGL as an active architecture candidate. A probe-only real-egui software renderer is now in-tree as `glyphflick-software-ui-probe`. It reuses the actual Glyphflick app, corpus, font atlas, and egui tessellation, then rasterizes the resulting meshes into softbuffer. The next target measurement decides whether CPU rendering preserves the flat-presenter startup advantage once the real UI is included.
+
+The softbuffer dependency and software renderer remain probe-only and are excluded from the normal production feature set. Runtime-budget CI still reports the normal release at 6,181,056 bytes / 5.895 MiB.
 
 ## Q013 — Real Wayland QA
 
