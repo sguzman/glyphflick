@@ -2,16 +2,16 @@
 
 ## Architectural goal
 
-Keep Glyphflick small enough that its architecture explains the whole application rather than hiding it.
+Keep Glyphflick small enough that its architecture explains the whole application rather than hiding it. Latency from invocation to a useful, populated picker is the primary runtime constraint.
 
-The MVP is a single Rust binary with a deliberately narrow Wayland/EGL runtime around egui.
+The application is one native Rust process with a Wayland-only window, egui interaction/state, CPU rasterization, and software presentation through softbuffer.
 
 ## Module boundaries
 
 ```text
 main
  |
- +-- runtime      Wayland/winit + EGL/glutin + egui_glow event/render loop
+ +-- runtime      Wayland/winit + egui-winit + CPU rasterizer + softbuffer
  +-- app          egui state + interaction state machine
  +-- corpus       glyph records + bundled dataset adapter
  +-- search       normalization + ranking/filtering
@@ -20,35 +20,25 @@ main
  +-- perf         compile-time optional timing probes
 ```
 
-The boundaries are intentional: UI/domain code should not depend on window-system or OpenGL setup.
+UI/domain code does not own process/window lifecycle or presentation.
 
 ## Runtime architecture
 
-Glyphflick does **not** use eframe.
+Glyphflick does **not** use eframe, OpenGL, EGL, GLX, X11, or wgpu.
 
-The runtime is intentionally assembled from the narrower layers underneath it:
+The runtime is assembled from:
 
-- `winit` for a Wayland-only event loop/window;
-- `glutin` + `glutin-winit` for EGL/OpenGL context creation;
-- `egui_glow` for egui input translation and Glow rendering;
-- `egui` for the immediate-mode UI.
+- `winit` for a Wayland-only event loop and window;
+- `egui-winit` for input/platform integration;
+- `egui` for immediate-mode UI and tessellation;
+- a project-owned CPU mesh rasterizer;
+- `softbuffer` for presenting the CPU framebuffer to Wayland.
 
-Runtime features are trimmed aggressively:
+The event loop uses `ControlFlow::Wait`; there is no continuous polling or intentional display-refresh wait. The first useful frame contains the search field and visible result grid.
 
-- Wayland enabled;
-- X11 disabled;
-- EGL enabled;
-- GLX disabled;
-- wgpu absent;
-- egui-winit OS clipboard feature absent;
-- egui link opening absent;
-- no eframe persistence/application framework.
+The software renderer consumes egui meshes, applies texture deltas including the color-emoji atlas, clips primitives, fast-paths canonical axis-aligned quads, falls back to textured-triangle rasterization, and presents the completed buffer through softbuffer.
 
-The event loop uses `ControlFlow::Wait`, so Glyphflick does not continuously poll while idle.
-
-Swap interval is requested as `DontWait`; the picker has no reason to wait for a display refresh boundary before presenting a ready frame.
-
-On Wayland, the window is expected to become visible when its first buffer is presented, avoiding a separate splash/blank-frame path.
+OpenGL/EGL were measured during architecture selection and removed after repeated target-host tests showed the software path roughly halved process-to-first-useful-frame latency.
 
 ## Data model
 
@@ -64,85 +54,43 @@ Glyph {
 }
 ```
 
-The UI does not depend directly on a third-party emoji crate's public types. External corpus types terminate inside the corpus adapter.
+The UI does not expose third-party emoji crate types.
 
 ## Corpus strategy
 
-MVP corpus requirements:
-
-- local;
-- deterministic;
-- compile-time/bundled metadata;
-- no network;
-- preserves multi-codepoint sequences exactly;
-- canonical names and useful aliases;
-- no startup filesystem discovery.
-
-The current adapter stores static emoji references and expands skin-tone variants into a compact index once per invocation. That construction cost is instrumented because even small startup work must earn its place.
+The corpus is local, deterministic, preserves exact multi-codepoint sequences, and performs no network access or runtime discovery. The current adapter stores static emoji references and expands skin-tone variants into a compact index once per invocation.
 
 ## Search architecture
 
-Search is a deterministic component:
+Search is deterministic:
 
 ```text
 (query, corpus) -> ranked result indices
 ```
 
-Current behavior is deliberately simple:
-
-- linear scan over a small corpus;
-- reusable result/bucket vectors;
-- no per-query sort;
-- no fuzzy-search dependency;
-- no startup-built search index;
-- ASCII case-insensitive matching for the English canonical names/shortcodes.
-
-This stays simple until measurements show search itself is material.
+It uses reusable result/bucket vectors, no per-query sort, no fuzzy-search dependency, and ASCII case-insensitive matching for English canonical names and shortcodes. Search remains deliberately simple because measured startup/search cost is negligible compared with first-frame glyph rendering.
 
 ## UI architecture
 
-egui owns rendering and immediate-mode interaction, not process/window lifecycle.
+egui owns UI interaction and tessellation, not process lifetime.
 
-The application state holds:
+The application state holds the query, active result, ranked result indices, transient error state, commit/cancel intent, visible-grid bookkeeping, and the dedicated emoji font id.
 
-- query;
-- active result;
-- ranked result indices;
-- transient error state;
-- commit/cancel intent;
-- visible-grid bookkeeping.
-
-The app requests exit with a boolean; the runtime owns actual event-loop termination. This keeps the app testable without eframe or a Wayland session.
+The result grid is row-virtualized. Each visible glyph uses a project-owned fixed-size cell rather than egui's general-purpose Button atom-layout path. The custom cell retains click sensing, selection styling, hover names, accessibility metadata, and the same egui text rendering.
 
 ## Keyboard navigation
 
-Navigation is a small index state machine rather than an additional widget tree.
-
-It performs:
-
-- constant-space row/column movement;
-- no allocations;
-- no animation;
-- direct scroll offset jumps when the selected row leaves the visible range.
+Navigation is an index state machine: constant-space row/column movement, no allocation, no animation, and direct scroll jumps when selection leaves the visible row range.
 
 ## Clipboard abstraction
 
-The clipboard boundary is intentionally separate from egui's OS clipboard integration.
-
-Conceptual interface:
+Clipboard ownership is separate from egui platform clipboard support.
 
 ```text
 Clipboard::copy(text) -> success/failure
 ```
 
-The initial backend invokes `wl-copy` **only after a glyph is committed**.
-
-This is important for two reasons:
-
-1. clipboard ownership can survive the visible picker process;
-2. no clipboard helper or clipboard library initialization is paid on Glyphflick's launch path.
-
-The direct egui runtime intentionally leaves egui-winit's OS clipboard feature disabled. Standard search-field paste can later be implemented on demand rather than paying clipboard initialization on every invocation.
+The current backend invokes `wl-copy` only after commit. No clipboard helper or general clipboard library is initialized on launch.
 
 ## Process model
 
@@ -152,8 +100,9 @@ external keybinding/launcher
     v
 Glyphflick process
     |
-    +-- Wayland/EGL init
-    +-- first egui frame
+    +-- Wayland window + softbuffer context
+    +-- egui input + first populated UI pass
+    +-- CPU raster + present
     +-- search / navigate
     +-- commit
     +-- wl-copy establishes selection
@@ -164,119 +113,42 @@ event loop exits immediately
 
 No resident Glyphflick daemon is required.
 
-If `wl-copy` leaves a narrowly scoped clipboard-provider process alive, that is clipboard ownership, not a Glyphflick service.
-
 ## Window/compositor boundary
 
-Glyphflick exposes:
-
-- Wayland application ID: `glyphflick`;
-- title: `Glyphflick`;
-- fixed transient-picker dimensions.
-
-It does not:
-
-- edit Hyprland config;
-- install keybindings;
-- assume a particular modifier;
-- embed Hyprland IPC in core behavior.
+Glyphflick exposes Wayland application ID `glyphflick`, title `Glyphflick`, and fixed transient-picker dimensions. It does not edit compositor configuration, install keybindings, assume a modifier, or embed Hyprland IPC.
 
 ## Dependency policy
 
-Every runtime dependency must justify startup cost.
+Every runtime dependency must justify startup cost. Avoid general async runtimes, databases, configuration frameworks before needed, logging stacks, plugin systems, runtime font discovery, GPU context stacks, and convenience framework layers that initialize unused subsystems.
 
-Avoid:
-
-- general async runtimes;
-- databases;
-- serialization/config frameworks before needed;
-- logging stacks;
-- plugin systems;
-- runtime font discovery without measurement;
-- convenience framework layers that initialize unused subsystems.
-
-A useful abstraction can still be the wrong abstraction for a process-per-invocation utility.
+Runtime-budget CI rejects X11, generic OS clipboard stacks, wgpu, and OpenGL/EGL/glutin dependencies from the default graph.
 
 ## Performance strategy
 
-Remove obvious unused work before profiling, then measure the rest.
+Measure process start to first useful presentation, optimize the dominant buckets, and delete superseded architecture once the measurements settle a decision.
 
 Current latency-oriented choices:
 
-- direct egui_glow runtime instead of eframe;
 - Wayland-only winit;
-- EGL-only glutin;
+- direct egui-winit integration;
+- software presentation through softbuffer;
+- project-owned CPU rasterization with a canonical-quad fast path;
+- custom minimal glyph cells;
+- no GPU context initialization;
 - no OS clipboard initialization during startup;
-- no application icon decode path;
-- no vsync wait request;
 - event-loop `Wait`, not `Poll`;
 - virtualized result rows;
 - allocation-reused search;
 - index-only keyboard navigation;
-- compile-time-zero-cost production instrumentation;
-- no startup files/network/config.
+- compile-time-optional timing instrumentation;
+- no startup network/config work.
 
-The remaining major unknowns are EGL/context creation, default-font initialization/coverage, corpus construction, and clipboard establishment.
-
-## Testing strategy
-
-### Unit tests
-
-- matching/ranking;
-- alias behavior;
-- Unicode sequence preservation;
-- keyboard selection movement;
-- clipboard success/failure state transitions.
-
-### Integration-ish tests
-
-Fake the clipboard boundary to prove:
-
-- selected text remains exact;
-- successful copy requests exit;
-- failed copy remains recoverable;
-- cancellation never writes the clipboard.
-
-### Host QA
-
-Real Wayland validation is still required for:
-
-- actual process startup/first presentation;
-- focus;
-- clipboard persistence;
-- compositor-visible app identity;
-- emoji font rendering;
-- repeated invocation.
-
-Host QA is the final layer, not a substitute for automated/static validation.
-
-## Packaging
-
-Deferred until the runtime is proven.
-
-Likely eventual targets:
-
-- release binary;
-- Arch/AUR-friendly package;
-- generic installation documentation.
-
-## Security/privacy
-
-Normal operation should:
-
-- make no network requests;
-- execute no remote content;
-- store no telemetry;
-- require no elevated privileges.
-
+Target-host measurements have repeatedly put the production software path near 23-25 ms median first presentation, versus roughly 55 ms for the former OpenGL/EGL path.
 
 ## Font rendering
 
-Glyphflick keeps UI text and emoji rendering separate.
+UI text uses bundled Ubuntu Light. Emoji cells use a dedicated `Glyphflick Emoji` family backed by a read-only mmap of a known Noto Color Emoji path. There is no fontconfig enumeration or directory walk. Color-font support comes from the pinned egui/epaint revision with `color_fonts` enabled.
 
-- UI text uses the bundled Ubuntu Light face.
-- Emoji cells use a named `Glyphflick Emoji` family.
-- On Linux, the runtime probes a short fixed list for `NotoColorEmoji.ttf`, checking the Arch/EndeavourOS path first.
-- The selected file is mapped read-only with `mmap`; there is no fontconfig enumeration or directory scan.
-- Color-font support comes from a pinned egui/epaint revision with the `color_fonts` renderer enabled.
-- Missing-host-font behavior remains an explicit QA/design item; core search/copy data is independent of rendering.
+## Testing strategy
+
+Unit tests cover search/ranking, Unicode sequence preservation, keyboard selection movement, clipboard state transitions, and raster fast-path invariants. CI runs format, shell validation, check, tests, strict clippy, dependency guards, and a stripped release-size budget. Real Wayland validation remains the final layer for compositor-visible behavior and latency.

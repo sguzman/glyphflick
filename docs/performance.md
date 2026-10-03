@@ -330,3 +330,20 @@ The dominant remaining startup bucket is now the egui first-frame run at roughly
 - egui work performed after the app closure returns.
 
 That split determines whether the next optimization should simplify the widget tree or target egui/font-frame processing.
+
+
+### Fast-grid A/B and OpenGL retirement
+
+At commit `4919248`, the seven-launch target-host A/B measured:
+
+| Mode | Grid p50 | egui p50 | Raster p50 | First present/swap p50 |
+| --- | ---: | ---: | ---: | ---: |
+| Production software baseline | 10.888 ms | 11.658 ms | 8.945 ms | 24.268 ms |
+| Minimal-cell software candidate | 10.290 ms | 11.074 ms | 8.786 ms | 23.442 ms |
+| Legacy OpenGL/EGL | n/a | 12.075 ms | 2.369 ms GL paint | 54.881 ms |
+
+The minimal cell saves 0.598 ms in the grid and 0.826 ms end-to-end at the median while keeping the same 90 visible glyphs, click targets, hover names, selection state, scrolling, and accessibility metadata. It is promoted to production.
+
+The OpenGL comparison path has served its purpose. Repeated measurements established that EGL/context startup overwhelms the faster GPU paint for this one-shot utility. The legacy OpenGL/EGL code and direct dependencies are removed rather than retained as a dormant alternate architecture.
+
+The next software-only diagnostic suppresses glyph text painting while retaining cell allocation/interaction. Its delta isolates how much of the remaining ~10 ms grid cost comes from emoji text shaping/font work and the resulting raster workload.

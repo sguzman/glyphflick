@@ -1,6 +1,6 @@
 # ADR 0006: Replace eframe with a direct Wayland/EGL egui runtime
 
-- Status: Accepted
+- Status: Superseded by ADR 0007
 - Date: 2026-10-02
 
 ## Context
@@ -76,3 +76,8 @@ That maintenance cost is accepted because latency is not incidental to Glyphflic
 This decision remains subject to target-host measurement.
 
 If the direct runtime does not materially improve startup, we still retain a narrower and more controllable dependency graph, but future architecture changes must be based on measured first-frame data.
+
+
+## Supersession
+
+Target-host measurement later showed that EGL/OpenGL context setup dominated launch latency. The production runtime was replaced by the software-presentation architecture documented in ADR 0007. This ADR is retained as historical reasoning for removing eframe, not as the current rendering-stack decision.

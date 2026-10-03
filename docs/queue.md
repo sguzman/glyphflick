@@ -20,17 +20,17 @@ Items are ordered unless a dependency or newly discovered defect requires reprio
 
 **Status: AUTOMATED VALIDATION GREEN / TARGET QA PENDING**
 
-The native Rust/egui binary uses a project-owned Wayland/EGL runtime rather than eframe.
+The native Rust/egui binary uses a project-owned Wayland software runtime rather than eframe or a GPU context stack.
 
 Acceptance:
 
-- [x] repository compiles in Linux CI with Wayland/EGL dependencies;
+- [x] repository compiles in Linux CI with Wayland software-presentation dependencies;
 - [x] release build executes on target Wayland environment;
 - [x] one binary named `glyphflick`;
 - [x] window path requires no network/configuration setup;
 - [x] app/corpus/search/clipboard/performance/runtime boundaries exist;
 - [x] eframe removed from the runtime dependency graph;
-- [x] Wayland-only winit + EGL-only glutin stack is explicit.
+- [x] Wayland-only winit + egui-winit + softbuffer stack is explicit.
 
 Automated validation passes formatting, `cargo check`, unit tests, and strict Clippy. Real Wayland execution remains target-host QA.
 
@@ -278,7 +278,7 @@ The deferred-grid shell is therefore diagnostic only and is not promoted: it imp
 
 The flat softbuffer result is large enough to justify removing EGL as an active architecture candidate. A probe-only real-egui software renderer is now in-tree as `glyphflick-software-ui-probe`. It reuses the actual Glyphflick app, corpus, font atlas, and egui tessellation, then rasterizes the resulting meshes into softbuffer. The next target measurement decides whether CPU rendering preserves the flat-presenter startup advantage once the real UI is included.
 
-Softbuffer and the CPU renderer are now the normal production path. EGL/glutin/egui_glow are feature-gated behind the legacy comparison binary and rejected from the default runtime dependency graph. Runtime-budget CI reports the promoted software release at approximately 5.77 MiB.
+Softbuffer and the CPU renderer are the normal production path. OpenGL/EGL/glutin/egui_glow code and direct dependencies are removed, and runtime-budget CI rejects their re-entry.
 
 ## Q013 — Real Wayland QA
 
@@ -349,4 +349,4 @@ When implementation lands but host QA is required, use `CODE COMPLETE / QA PENDI
 Only use `DONE` when its acceptance criteria are actually satisfied.
 
 
-Measured architecture result: production software presentation is now promoted. The latest seven-launch target run reached a 24.488 ms median first present versus 56.162 ms for the retained legacy OpenGL path, a 31.674 ms / 56.4% reduction. The first conservative quad raster fast path matched 93 quads and left 70 generic fallback triangles, with an 8.936 ms raster median. Next gate: split the remaining ~11.9 ms egui run into app/search/grid versus egui post-closure work before choosing the next optimization.
+Measured architecture result: the final seven-launch comparison measured 24.268 ms median for the software baseline, 23.442 ms for the minimal-cell software candidate, and 54.881 ms for legacy OpenGL/EGL. The minimal cell is promoted and the OpenGL comparison implementation is deleted. Next gate: a software-only no-grid-text diagnostic isolates emoji shaping/font work from cell/layout cost.
