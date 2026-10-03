@@ -192,59 +192,59 @@ impl<B: ClipboardBackend> GlyphflickApp<B> {
 
             let grid_start = timing.stamp();
             let mut rendered_items = 0_usize;
-                let spacing = ui.spacing().item_spacing.x;
-                let columns = ((ui.available_width() + spacing) / (CELL_SIZE + spacing))
-                    .floor()
-                    .max(1.0) as usize;
-                self.columns = columns;
+            let spacing = ui.spacing().item_spacing.x;
+            let columns = ((ui.available_width() + spacing) / (CELL_SIZE + spacing))
+                .floor()
+                .max(1.0) as usize;
+            self.columns = columns;
 
-                let row_height = CELL_SIZE + ui.spacing().item_spacing.y;
-                let rows = self.results.len().div_ceil(columns);
-                let active = self.selection.active();
+            let row_height = CELL_SIZE + ui.spacing().item_spacing.y;
+            let rows = self.results.len().div_ceil(columns);
+            let active = self.selection.active();
 
-                let mut scroll = egui::ScrollArea::vertical().auto_shrink([false, false]);
-                if let Some(row) = self.scroll_row.take() {
-                    scroll = scroll.vertical_scroll_offset(row as f32 * row_height);
-                }
+            let mut scroll = egui::ScrollArea::vertical().auto_shrink([false, false]);
+            if let Some(row) = self.scroll_row.take() {
+                scroll = scroll.vertical_scroll_offset(row as f32 * row_height);
+            }
 
-                let mut visible_rows = self.visible_rows.clone();
-                scroll.show_rows(ui, row_height, rows, |ui, row_range| {
-                    visible_rows = row_range.clone();
+            let mut visible_rows = self.visible_rows.clone();
+            scroll.show_rows(ui, row_height, rows, |ui, row_range| {
+                visible_rows = row_range.clone();
 
-                    for row in row_range {
-                        ui.horizontal(|ui| {
-                            for column in 0..columns {
-                                let position = row * columns + column;
-                                let Some(index) = self.results.get(position) else {
-                                    break;
-                                };
-                                let glyph = self.corpus.get(index);
-                                rendered_items += 1;
+                for row in row_range {
+                    ui.horizontal(|ui| {
+                        for column in 0..columns {
+                            let position = row * columns + column;
+                            let Some(index) = self.results.get(position) else {
+                                break;
+                            };
+                            let glyph = self.corpus.get(index);
+                            rendered_items += 1;
 
-                                let selected = active == Some(position);
-                                let response = glyph_cell(
-                                    ui,
-                                    selected,
-                                    glyph.text(),
-                                    glyph.name(),
-                                    &self.emoji_font,
-                                    !self.timing.suppress_grid_text(),
-                                );
+                            let selected = active == Some(position);
+                            let response = glyph_cell(
+                                ui,
+                                selected,
+                                glyph.text(),
+                                glyph.name(),
+                                &self.emoji_font,
+                                !self.timing.suppress_grid_text(),
+                            );
 
-                                if response.clicked() {
-                                    picked = Some(glyph.text());
-                                }
+                            if response.clicked() {
+                                picked = Some(glyph.text());
                             }
-                        });
-                    }
-                });
-                self.visible_rows = visible_rows;
-
-                if self.results.is_empty() {
-                    ui.centered_and_justified(|ui| {
-                        ui.weak("No matching glyphs");
+                        }
                     });
                 }
+            });
+            self.visible_rows = visible_rows;
+
+            if self.results.is_empty() {
+                ui.centered_and_justified(|ui| {
+                    ui.weak("No matching glyphs");
+                });
+            }
 
             timing.report_ui_grid(grid_start, rendered_items);
         });
